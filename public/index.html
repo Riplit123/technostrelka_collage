@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a0a0a">
+<title>Технострелка 2026 — Загрузи фото</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Unbounded:wght@400;600;800&display=swap" rel="stylesheet">
+
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --surface-2: #1e1e1e;
+    --accent: #ff3d2e;
+    --accent-hover: #ff5a4d;
+    --text: #ffffff;
+    --text-dim: #a0a0a0;
+    --border: #2a2a2a;
+    --success: #22c55e;
+    --danger: #ef4444;
+  }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Unbounded', -apple-system, BlinkMacSystemFont, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  body {
+    padding: 20px 16px 40px;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+
+  .header h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(32px, 9vw, 44px);
+    letter-spacing: 2px;
+    line-height: 1;
+    background: linear-gradient(135deg, #fff 0%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .header p {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-top: 6px;
+    font-weight: 400;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .preview-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 16px;
+    overflow: hidden;
+    background: var(--surface-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed var(--border);
+    touch-action: none;
+  }
+
+  .preview-wrap.has-photo {
+    border-style: solid;
+    border-color: var(--border);
+  }
+
+  .preview-placeholder {
+    text-align: center;
+    color: var(--text-dim);
+    padding: 20px;
+  }
+
+  .preview-placeholder svg {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 12px;
+    opacity: 0.4;
+  }
+
+  .preview-placeholder div {
+    font-size: 14px;
+  }
+
+  #previewImg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: none;
+  }
+
+  #previewImg.visible {
+    display: block;
+  }
+
+  .text-overlay {
+    position: absolute;
+    left: 50%;
+    top: 85%;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 44px;
+    line-height: 1;
+    letter-spacing: 2px;
+    color: #fff;
+    text-shadow:
+      0 2px 8px rgba(0,0,0,0.7),
+      0 0 2px rgba(0,0,0,0.5);
+    cursor: move;
+    touch-action: none;
+    white-space: nowrap;
+    transform: translate(-50%, -50%) rotate(0deg) scale(1);
+    transform-origin: center center;
+    padding: 4px 8px;
+    user-select: none;
+    -webkit-user-select: none;
+    display: none;
+    will-change: transform, left, top;
+  }
+
+  .text-overlay.visible {
+    display: block;
+  }
+
+  .text-overlay.active {
+    opacity: 0.9;
+  }
+
+  .text-overlay .drag-hint {
+    position: absolute;
+    top: -26px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Unbounded', sans-serif;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    color: #fff;
+    background: rgba(0,0,0,0.75);
+    padding: 4px 10px;
+    border-radius: 10px;
+    text-shadow: none;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+
+  .text-overlay.show-hint .drag-hint {
+    opacity: 1;
+  }
+
+  .btn {
+    width: 100%;
+    padding: 16px;
+    border: none;
+    border-radius: 14px;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    letter-spacing: 0.3px;
+  }
+
+  .btn:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+  }
+
+  .btn-secondary {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--border);
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-row {
+    margin-top: 12px;
+  }
+
+  .source-picker {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .input-group {
+    margin-top: 16px;
+  }
+
+  .input-label {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    letter-spacing: 0.3px;
+  }
+
+  .char-counter {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .char-counter.warn {
+    color: var(--accent);
+  }
+
+  input[type="text"] {
+    width: 100%;
+    padding: 14px 16px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input[type="text"]:focus {
+    border-color: var(--accent);
+  }
+
+  .color-palette {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .color-dot {
+    aspect-ratio: 1;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.15s, border-color 0.15s;
+  }
+
+  .color-dot:active {
+    transform: scale(0.9);
+  }
+
+  .color-dot.active {
+    border-color: #fff;
+    transform: scale(1.1);
+  }
+
+  .color-dot.light {
+    box-shadow: inset 0 0 0 1px var(--border);
+  }
+
+  .text-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .text-action-btn {
+    flex: 1;
+    padding: 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .text-action-btn:active {
+    transform: scale(0.97);
+  }
+
+  .text-action-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .status-box {
+    padding: 14px;
+    border-radius: 12px;
+    font-size: 14px;
+    text-align: center;
+    margin-top: 12px;
+    line-height: 1.4;
+    display: none;
+  }
+
+  .status-box.visible {
+    display: block;
+  }
+
+  .status-box.success {
+    background: rgba(34, 197, 94, 0.12);
+    color: var(--success);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+  }
+
+  .status-box.error {
+    background: rgba(239, 68, 68, 0.12);
+    color: var(--danger);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+
+  .cooldown-box {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    text-align: center;
+    margin-top: 12px;
+    display: none;
+  }
+
+  .cooldown-box.visible {
+    display: block;
+  }
+
+  .cooldown-title {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  .cooldown-timer {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 36px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  #fileInputGallery,
+  #fileInputCamera {
+    display: none;
+  }
+
+  .footer-hint {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 11px;
+    margin-top: 20px;
+    line-height: 1.5;
+    padding: 0 12px;
+  }
+
+  /* ===== ДОБАВЛЕНО: баннер блокировки приёма фото ===== */
+  .lock-banner {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    background: rgba(239, 68, 68, 0.10);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    color: #fecaca;
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  .lock-banner.visible {
+    display: flex;
+  }
+  .lock-banner .ico {
+    font-size: 22px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .lock-banner .txt b {
+    color: #fff;
+    font-weight: 700;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>ТЕХНОСТРЕЛКА 2026</h1>
+  <p>Добавь своё фото в общий коллаж</p>
+</div>
+
+<!-- Баннер "приём фото выключен" -->
+<div class="lock-banner" id="lockBanner">
+  <span class="ico">⏸</span>
+  <span class="txt"><b>Приём фото приостановлен</b><br>Организатор временно отключил загрузку. Попробуй позже.</span>
+</div>
+
+<div class="card">
+  <div class="preview-wrap" id="previewWrap">
+    <div class="preview-placeholder" id="placeholder">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="3" y="5" width="18" height="14" rx="2"/>
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M8 5l1.5-2h5L16 5"/>
+      </svg>
+      <div>Выбери фото из галереи<br>или сделай новое</div>
+    </div>
+    <img id="previewImg" alt="">
+    <div class="text-overlay" id="textOverlay">
+      <span class="drag-hint">перетащи · двумя пальцами — масштаб и поворот</span>
+      <span id="textOverlayContent"></span>
+    </div>
+  </div>
+
+  <input type="file" id="fileInputGallery" accept="image/*">
+  <input type="file" id="fileInputCamera" accept="image/*" capture="environment">
+
+  <div class="source-picker">
+    <button class="btn btn-secondary" id="pickGalleryBtn" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <circle cx="9" cy="9" r="2"/>
+        <path d="M21 15l-5-5L5 21"/>
+      </svg>
+      Галерея
+    </button>
+    <button class="btn btn-secondary" id="pickCameraBtn" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+        <circle cx="12" cy="13" r="4"/>
+      </svg>
+      Камера
+    </button>
+  </div>
+
+  <div class="input-group">
+    <div class="input-label">
+      <span>Подпись (необязательно)</span>
+      <span class="char-counter" id="charCounter">0/15</span>
+    </div>
+    <input type="text" id="captionInput" maxlength="15" placeholder="Твоё имя или слово" autocomplete="off">
+
+    <div class="color-palette" id="colorPalette"></div>
+
+    <div class="text-actions" id="textActions" style="display:none">
+      <button class="text-action-btn" id="resetTextBtn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 12a9 9 0 109-9 9 9 0 00-6.3 2.6L3 8"/>
+          <path d="M3 3v5h5"/>
+        </svg>
+        Сбросить позицию
+      </button>
+    </div>
+  </div>
+
+  <button class="btn btn-primary btn-row" id="submitBtn" type="button" disabled>
+    <span id="submitText">Отправить</span>
+  </button>
+
+  <div class="status-box" id="statusBox"></div>
+
+  <div class="cooldown-box" id="cooldownBox">
+    <div class="cooldown-title">Следующее фото можно отправить через</div>
+    <div class="cooldown-timer" id="cooldownTimer">00:60</div>
+  </div>
+</div>
+
+<div class="footer-hint">
+  Фото проходит модерацию и появится на большом экране после одобрения
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // === Константы ===
+  const MAX_CAPTION = 15;
+  const COOLDOWN_MS = 60 * 1000;
+  const COOLDOWN_KEY = 'ts2026_next_upload_ts';
+  const COLOR_KEY = 'ts2026_color';
+  const OUTPUT_SIZE = 1080;
+
+  const COLORS = [
+    { name: 'white',  value: '#ffffff', light: true  },
+    { name: 'red',    value: '#ff3d2e', light: false },
+    { name: 'yellow', value: '#ffd400', light: false },
+    { name: 'green',  value: '#22c55e', light: false },
+    { name: 'cyan',   value: '#22d3ee', light: false },
+    { name: 'pink',   value: '#ec4899', light: false },
+    { name: 'black',  value: '#000000', light: false }
+  ];
+
+  const MIN_SCALE = 0.4;
+  const MAX_SCALE = 3.0;
+
+  // === DOM ===
+  const fileInputGallery = document.getElementById('fileInputGallery');
+  const fileInputCamera  = document.getElementById('fileInputCamera');
+  const pickGalleryBtn   = document.getElementById('pickGalleryBtn');
+  const pickCameraBtn    = document.getElementById('pickCameraBtn');
+  const submitBtn        = document.getElementById('submitBtn');
+  const previewImg       = document.getElementById('previewImg');
+  const previewWrap      = document.getElementById('previewWrap');
+  const placeholder      = document.getElementById('placeholder');
+  const textOverlay      = document.getElementById('textOverlay');
+  const textOverlayText  = document.getElementById('textOverlayContent');
+  const captionInput     = document.getElementById('captionInput');
+  const charCounter      = document.getElementById('charCounter');
+  const colorPalette     = document.getElementById('colorPalette');
+  const textActions      = document.getElementById('textActions');
+  const resetTextBtn     = document.getElementById('resetTextBtn');
+  const statusBox        = document.getElementById('statusBox');
+  const cooldownBox      = document.getElementById('cooldownBox');
+  const cooldownTimer    = document.getElementById('cooldownTimer');
+  const lockBanner       = document.getElementById('lockBanner'); // <-- новое
+
+  // === Состояние ===
+  let selectedFile = null;
+  let currentColor = localStorage.getItem(COLOR_KEY) || '#ffffff';
+  // Трансформация текста
+  let textState = {
+    x: 50,     // %
+    y: 85,     // %
+    scale: 1,  // коэффициент
+    rotation: 0 // градусы
+  };
+  let baseFontPx = 44; // вычисляется под ширину превью
+
+  let cooldownInterval = null;
+  let isSubmitting = false;
+
+  // НОВОЕ: глобальный свич «принимаем ли фото»
+  let uploadsEnabled = true;
+
+  // =====================================================
+  //   ПАЛИТРА
+  // =====================================================
+  COLORS.forEach(c => {
+    const dot = document.createElement('div');
+    dot.className = 'color-dot' + (c.light ? ' light' : '');
+    dot.style.background = c.value;
+    dot.dataset.color = c.value;
+    if (c.value === currentColor) dot.classList.add('active');
+    dot.addEventListener('click', () => {
+      currentColor = c.value;
+      localStorage.setItem(COLOR_KEY, c.value);
+      document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+      dot.classList.add('active');
+      textOverlay.style.color = c.value;
+    });
+    colorPalette.appendChild(dot);
+  });
+  textOverlay.style.color = currentColor;
+
+  // =====================================================
+  //   ВЫБОР ФАЙЛА
+  // =====================================================
+  pickGalleryBtn.addEventListener('click', () => {
+    if (!uploadsEnabled) { showStatus('Приём фото приостановлен организатором', 'error'); return; }
+    if (checkCooldown()) return;
+    fileInputGallery.click();
+  });
+
+  pickCameraBtn.addEventListener('click', () => {
+    if (!uploadsEnabled) { showStatus('Приём фото приостановлен организатором', 'error'); return; }
+    if (checkCooldown()) return;
+    fileInputCamera.click();
+  });
+
+  [fileInputGallery, fileInputCamera].forEach(inp => {
+    inp.addEventListener('change', e => handleFile(e.target.files && e.target.files[0]));
+  });
+
+  function handleFile(f) {
+    if (!f) return;
+    if (!/^image\//.test(f.type)) {
+      showStatus('Можно загружать только изображения', 'error');
+      return;
+    }
+    if (f.size > 20 * 1024 * 1024) {
+      showStatus('Файл слишком большой (макс. 20 МБ)', 'error');
+      return;
+    }
+
+    try {
+      const url = URL.createObjectURL(f);
+      previewImg.src = url;
+      previewImg.classList.add('visible');
+      placeholder.style.display = 'none';
+      previewWrap.classList.add('has-photo');
+      selectedFile = f;
+      resetTextTransform();
+      updateSubmitState();
+      updateTextOverlay();
+      hideStatus();
+    } catch (err) {
+      showStatus('Не удалось прочитать файл', 'error');
+    }
+  }
+
+  // =====================================================
+  //   ПОДПИСЬ
+  // =====================================================
+  captionInput.addEventListener('input', () => {
+    const len = captionInput.value.length;
+    charCounter.textContent = `${len}/${MAX_CAPTION}`;
+    charCounter.classList.toggle('warn', len >= MAX_CAPTION);
+    updateTextOverlay();
+  });
+
+  function updateTextOverlay() {
+    const txt = captionInput.value.trim();
+    if (txt && previewImg.classList.contains('visible')) {
+      textOverlayText.textContent = txt;
+      textOverlay.classList.add('visible');
+      textActions.style.display = 'flex';
+      fitBaseFontSize();
+      applyTextTransform();
+      if (!textOverlay.dataset.hintShown) {
+        textOverlay.classList.add('show-hint');
+        setTimeout(() => textOverlay.classList.remove('show-hint'), 3000);
+        textOverlay.dataset.hintShown = '1';
+      }
+    } else {
+      textOverlay.classList.remove('visible');
+      textActions.style.display = 'none';
+    }
+  }
+
+  // Базовый размер шрифта подбираем так, чтобы текст помещался в превью при scale=1
+  function fitBaseFontSize() {
+    const wrapW = previewWrap.clientWidth;
+    if (!wrapW) return;
+    const maxW = wrapW * 0.9;
+    let size = Math.round(wrapW * 0.11);
+    textOverlay.style.fontSize = size + 'px';
+    // временно снимаем scale/rotate для измерения
+    const prev = textOverlay.style.transform;
+    textOverlay.style.transform = 'translate(-50%, -50%)';
+    let guard = 30;
+    while (textOverlay.scrollWidth > maxW && size > 14 && guard-- > 0) {
+      size -= 2;
+      textOverlay.style.fontSize = size + 'px';
+    }
+    textOverlay.style.transform = prev;
+    baseFontPx = size;
+  }
+  function applyTextTransform() {
+    textOverlay.style.left = textState.x + '%';
+    textOverlay.style.top  = textState.y + '%';
+    textOverlay.style.transform =
+      `translate(-50%, -50%) rotate(${textState.rotation}deg) scale(${textState.scale})`;
+  }
+
+  function resetTextTransform() {
+    textState = { x: 50, y: 85, scale: 1, rotation: 0 };
+    applyTextTransform();
+  }
+
+  resetTextBtn.addEventListener('click', () => {
+    resetTextTransform();
+  });
+
+  // =====================================================
+  //   ЖЕСТЫ: 1 палец — drag, 2 пальца — pinch + rotate
+  // =====================================================
+  const pointers = new Map();
+  let gestureMode = null; // 'drag' | 'transform' | null
+  let dragStart = null;
+  let twoFingerStart = null;
+
+  textOverlay.addEventListener('pointerdown', onPointerDown);
+
+  function onPointerDown(e) {
+    e.preventDefault();
+    try { textOverlay.setPointerCapture(e.pointerId); } catch (err) {}
+    pointers.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
+
+    textOverlay.classList.add('active');
+
+    if (pointers.size === 1) {
+      gestureMode = 'drag';
+      const p = Array.from(pointers.values())[0];
+      dragStart = {
+        startClient: { x: p.clientX, y: p.clientY },
+        startTextPct: { x: textState.x, y: textState.y }
+      };
+    } else if (pointers.size === 2) {
+      gestureMode = 'transform';
+      const pts = Array.from(pointers.values());
+      const dx = pts[1].clientX - pts[0].clientX;
+      const dy = pts[1].clientY - pts[0].clientY;
+      const dist = Math.hypot(dx, dy);
+      const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+
+      const rect = previewWrap.getBoundingClientRect();
+      const cxPx = (pts[0].clientX + pts[1].clientX) / 2;
+      const cyPx = (pts[0].clientY + pts[1].clientY) / 2;
+      const centerPct = {
+        x: ((cxPx - rect.left) / rect.width) * 100,
+        y: ((cyPx - rect.top)  / rect.height) * 100
+      };
+
+      twoFingerStart = {
+        distance: dist,
+        angle: ang,
+        startScale: textState.scale,
+        startRotation: textState.rotation,
+        startTextPct: { x: textState.x, y: textState.y },
+        startCenterPct: centerPct
+      };
+      dragStart = null;
+    }
+  }
+
+  window.addEventListener('pointermove', onPointerMove, { passive: false });
+
+  function onPointerMove(e) {
+    if (!pointers.has(e.pointerId)) return;
+    e.preventDefault();
+    pointers.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
+
+    if (gestureMode === 'drag' && pointers.size === 1 && dragStart) {
+      const rect = previewWrap.getBoundingClientRect();
+      const p = Array.from(pointers.values())[0];
+      const dxPct = ((p.clientX - dragStart.startClient.x) / rect.width) * 100;
+      const dyPct = ((p.clientY - dragStart.startClient.y) / rect.height) * 100;
+
+      let nx = dragStart.startTextPct.x + dxPct;
+      let ny = dragStart.startTextPct.y + dyPct;
+      nx = Math.max(2, Math.min(98, nx));
+      ny = Math.max(3, Math.min(98, ny));
+      textState.x = nx;
+      textState.y = ny;
+      applyTextTransform();
+    } else if (gestureMode === 'transform' && pointers.size >= 2 && twoFingerStart) {
+      const pts = Array.from(pointers.values()).slice(0, 2);
+      const dx = pts[1].clientX - pts[0].clientX;
+      const dy = pts[1].clientY - pts[0].clientY;
+      const dist = Math.hypot(dx, dy);
+      const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+
+      let newScale = twoFingerStart.startScale * (dist / twoFingerStart.distance);
+      newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
+
+      let newRot = twoFingerStart.startRotation + (ang - twoFingerStart.angle);
+      while (newRot > 180) newRot -= 360;
+      while (newRot < -180) newRot += 360;
+
+      const rect = previewWrap.getBoundingClientRect();
+      const cxPx = (pts[0].clientX + pts[1].clientX) / 2;
+      const cyPx = (pts[0].clientY + pts[1].clientY) / 2;
+      const centerPct = {
+        x: ((cxPx - rect.left) / rect.width) * 100,
+        y: ((cyPx - rect.top)  / rect.height) * 100
+      };
+      const deltaX = centerPct.x - twoFingerStart.startCenterPct.x;
+      const deltaY = centerPct.y - twoFingerStart.startCenterPct.y;
+
+      let nx = twoFingerStart.startTextPct.x + deltaX;
+      let ny = twoFingerStart.startTextPct.y + deltaY;
+      nx = Math.max(2, Math.min(98, nx));
+      ny = Math.max(3, Math.min(98, ny));
+
+      textState.scale = newScale;
+      textState.rotation = newRot;
+      textState.x = nx;
+      textState.y = ny;
+      applyTextTransform();
+    }
+  }
+
+  window.addEventListener('pointerup', onPointerEnd);
+  window.addEventListener('pointercancel', onPointerEnd);
+
+  function onPointerEnd(e) {
+    if (pointers.has(e.pointerId)) {
+      pointers.delete(e.pointerId);
+    }
+    try { textOverlay.releasePointerCapture(e.pointerId); } catch (err) {}
+
+    if (pointers.size === 0) {
+      gestureMode = null;
+      dragStart = null;
+      twoFingerStart = null;
+      textOverlay.classList.remove('active');
+    } else if (pointers.size === 1) {
+      const p = Array.from(pointers.values())[0];
+      gestureMode = 'drag';
+      dragStart = {
+        startClient: { x: p.clientX, y: p.clientY },
+        startTextPct: { x: textState.x, y: textState.y }
+      };
+      twoFingerStart = null;
+    }
+  }
+
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(ev => {
+    previewWrap.addEventListener(ev, e => e.preventDefault());
+  });
+
+  window.addEventListener('resize', () => {
+    if (textOverlay.classList.contains('visible')) {
+      fitBaseFontSize();
+      applyTextTransform();
+    }
+  });
+
+  // =====================================================
+  //   КУЛДАУН
+  // =====================================================
+  function getNextTs() {
+    const v = parseInt(localStorage.getItem(COOLDOWN_KEY) || '0', 10);
+    return isNaN(v) ? 0 : v;
+  }
+
+  function setNextTs(ts) {
+    localStorage.setItem(COOLDOWN_KEY, String(ts));
+  }
+
+  function checkCooldown() {
+    const now = Date.now();
+    const next = getNextTs();
+    if (next > now) {
+      startCooldown(next);
+      return true;
+    }
+    return false;
+  }
+
+  function startCooldown(untilTs) {
+    cooldownBox.classList.add('visible');
+    submitBtn.disabled = true;
+    pickGalleryBtn.disabled = true;
+    pickCameraBtn.disabled = true;
+
+    const tick = () => {
+      const ms = untilTs - Date.now();
+      if (ms <= 0) {
+        clearInterval(cooldownInterval);
+        cooldownInterval = null;
+        cooldownBox.classList.remove('visible');
+        // Разблокируем только если приём фото включён
+        if (uploadsEnabled) {
+          pickGalleryBtn.disabled = false;
+          pickCameraBtn.disabled = false;
+        }
+        updateSubmitState();
+        return;
+      }
+      const sec = Math.ceil(ms / 1000);
+      const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+      const ss = String(sec % 60).padStart(2, '0');
+      cooldownTimer.textContent = `${mm}:${ss}`;
+    };
+
+    tick();
+    if (cooldownInterval) clearInterval(cooldownInterval);
+    cooldownInterval = setInterval(tick, 250);
+  }
+
+  checkCooldown();
+
+  // =====================================================
+  //   СОСТОЯНИЕ КНОПКИ
+  // =====================================================
+  function updateSubmitState() {
+    const cooldownActive = getNextTs() > Date.now();
+    submitBtn.disabled = !selectedFile || isSubmitting || cooldownActive || !uploadsEnabled;
+  }
+
+  // =====================================================
+  //   СВИЧ «ПРИЁМ ФОТО» (управляется суперадмином)
+  // =====================================================
+  function applyUploadsState() {
+    const cooldownActive = getNextTs() > Date.now();
+
+    if (uploadsEnabled) {
+      lockBanner.classList.remove('visible');
+      if (!cooldownActive) {
+        pickGalleryBtn.disabled = false;
+        pickCameraBtn.disabled = false;
+      }
+    } else {
+      lockBanner.classList.add('visible');
+      pickGalleryBtn.disabled = true;
+      pickCameraBtn.disabled = true;
+    }
+    updateSubmitState();
+  }
+
+  // Начальное состояние с сервера
+  fetch('/api/uploads-state')
+    .then(r => r.json())
+    .then(d => {
+      if (d && d.ok) {
+        uploadsEnabled = !!d.enabled;
+        applyUploadsState();
+      }
+    })
+    .catch(() => {});
+
+  // WebSocket — слушаем изменения свича
+  (function connectWS() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    let ws;
+    try {
+      ws = new WebSocket(`${proto}//${location.host}/?role=uploader`);
+    } catch(_) {
+      setTimeout(connectWS, 3000);
+      return;
+    }
+
+    ws.addEventListener('message', (ev) => {
+      let msg;
+      try { msg = JSON.parse(ev.data); } catch(_) { return; }
+      if (msg.type === 'uploads_state') {
+        uploadsEnabled = !!msg.enabled;
+        applyUploadsState();
+      }
+    });
+
+    ws.addEventListener('close', () => setTimeout(connectWS, 3000));
+    ws.addEventListener('error', () => { try { ws.close(); } catch(_) {} });
+  })();
+
+  // =====================================================
+  //   РЕНДЕР НА CANVAS
+  // =====================================================
+  async function renderFinalBlob() {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const S = OUTPUT_SIZE;
+          const canvas = document.createElement('canvas');
+          canvas.width = S;
+          canvas.height = S;
+          const ctx = canvas.getContext('2d');
+
+          ctx.fillStyle = '#000';
+          ctx.fillRect(0, 0, S, S);
+
+          const iw = img.naturalWidth;
+          const ih = img.naturalHeight;
+          const srcSize = Math.min(iw, ih);
+          const sx = (iw - srcSize) / 2;
+          const sy = (ih - srcSize) / 2;
+          ctx.drawImage(img, sx, sy, srcSize, srcSize, 0, 0, S, S);
+
+          const txt = captionInput.value.trim();
+          if (txt) {
+            const wrapW = previewWrap.clientWidth || S;
+            const fontScale = S / wrapW;
+            const finalFontPx = Math.round(baseFontPx * fontScale);
+
+            const cx = S * (textState.x / 100);
+            const cy = S * (textState.y / 100);
+
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(textState.rotation * Math.PI / 180);
+            ctx.scale(textState.scale, textState.scale);
+
+            ctx.font = `${finalFontPx}px "Bebas Neue", sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = currentColor;
+
+            ctx.shadowColor = 'rgba(0,0,0,0.75)';
+            ctx.shadowBlur = Math.round(finalFontPx * 0.18);
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = Math.round(finalFontPx * 0.05);
+
+            const strokeColor = isLightColor(currentColor) ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.25)';
+            ctx.lineWidth = Math.max(2, Math.round(finalFontPx * 0.06));
+            ctx.strokeStyle = strokeColor;
+            ctx.lineJoin = 'round';
+
+            drawSpacedText(ctx, txt, 0, 0, finalFontPx * 0.05);
+            ctx.restore();
+          }
+
+          canvas.toBlob(blob => {
+            if (!blob) return reject(new Error('blob_failed'));
+            resolve(blob);
+          }, 'image/jpeg', 0.9);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      img.onerror = () => reject(new Error('image_load_failed'));
+      img.src = previewImg.src;
+    });
+  }
+
+  function drawSpacedText(ctx, text, cx, cy, spacing) {
+    const chars = Array.from(text);
+    let totalW = 0;
+    const widths = chars.map(ch => {
+      const w = ctx.measureText(ch).width;
+      totalW += w;
+      return w;
+    });
+    totalW += spacing * Math.max(0, chars.length - 1);
+
+    let x = cx - totalW / 2;
+    for (let i = 0; i < chars.length; i++) {
+      const w = widths[i];
+      const chx = x + w / 2;
+      ctx.strokeText(chars[i], chx, cy);
+      ctx.fillText(chars[i], chx, cy);
+      x += w + spacing;
+    }
+  }
+
+  function isLightColor(hex) {
+    const h = hex.replace('#', '');
+    if (h.length !== 6) return false;
+    const r = parseInt(h.slice(0, 2), 16);
+    const g = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    const y = (r * 299 + g * 587 + b * 114) / 1000;
+    return y > 180;
+  }
+
+  // =====================================================
+  //   ОТПРАВКА
+  // =====================================================
+  submitBtn.addEventListener('click', async () => {
+    if (!selectedFile || isSubmitting) return;
+    if (!uploadsEnabled) {
+      showStatus('Приём фото приостановлен организатором', 'error');
+      return;
+    }
+    if (checkCooldown()) return;
+
+    isSubmitting = true;
+    updateSubmitState();
+    submitBtn.innerHTML = '<span class="spinner"></span><span>Отправляем...</span>';
+    hideStatus();
+
+    try {
+      if (document.fonts && document.fonts.ready) {
+        try { await document.fonts.load('44px "Bebas Neue"'); } catch (e) {}
+        try { await document.fonts.ready; } catch (e) {}
+      }
+
+      const blob = await renderFinalBlob();
+
+      const fd = new FormData();
+      fd.append('photo', blob, 'photo.jpg');
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: fd
+      });
+
+      if (res.status === 429) {
+        const until = Date.now() + COOLDOWN_MS;
+        setNextTs(until);
+        startCooldown(until);
+        showStatus('Слишком часто. Подожди немного.', 'error');
+        return;
+      }
+
+      if (res.status === 423) {
+        // Сервер сообщил, что приём отключён
+        uploadsEnabled = false;
+        applyUploadsState();
+        showStatus('Приём фото приостановлен организатором', 'error');
+        return;
+      }
+
+      if (res.status === 507) {
+        showStatus('Лимит фотографий достигнут. Попробуй позже.', 'error');
+        return;
+      }
+
+      const data = await res.json().catch(() => ({ ok: false }));
+
+      if (!res.ok || !data.ok) {
+        const errMap = {
+          bad_format: 'Неподдерживаемый формат фото',
+          file_too_large: 'Файл слишком большой',
+          upload_failed: 'Не удалось обработать фото',
+          upload_limit: 'Слишком часто. Подожди немного.',
+          no_file: 'Файл не выбран'
+        };
+        const msg = errMap[data.error] || 'Ошибка отправки. Попробуй ещё раз.';
+        showStatus(msg, 'error');
+        return;
+      }
+
+      const until = Date.now() + COOLDOWN_MS;
+      setNextTs(until);
+
+      showStatus('Фото отправлено! Оно появится на экране после проверки модератором ✓', 'success');
+      resetForm();
+      startCooldown(until);
+    } catch (err) {
+      console.error(err);
+      showStatus('Нет связи с сервером. Проверь интернет.', 'error');
+    } finally {
+      isSubmitting = false;
+      submitBtn.innerHTML = '<span id="submitText">Отправить</span>';
+      updateSubmitState();
+    }
+  });
+
+  function resetForm() {
+    selectedFile = null;
+    fileInputGallery.value = '';
+    fileInputCamera.value = '';
+    previewImg.src = '';
+    previewImg.classList.remove('visible');
+    placeholder.style.display = '';
+    previewWrap.classList.remove('has-photo');
+    textOverlay.classList.remove('visible');
+    textActions.style.display = 'none';
+    captionInput.value = '';
+    charCounter.textContent = `0/${MAX_CAPTION}`;
+    charCounter.classList.remove('warn');
+    resetTextTransform();
+  }
+
+  // =====================================================
+  //   СТАТУС
+  // =====================================================
+  let statusTimeout = null;
+  function showStatus(text, type) {
+    statusBox.textContent = text;
+    statusBox.className = 'status-box visible ' + (type || 'info');
+    if (statusTimeout) clearTimeout(statusTimeout);
+    if (type === 'success') {
+      statusTimeout = setTimeout(hideStatus, 6000);
+    } else if (type === 'error') {
+      statusTimeout = setTimeout(hideStatus, 5000);
+    }
+  }
+
+  function hideStatus() {
+    statusBox.classList.remove('visible');
+    if (statusTimeout) {
+      clearTimeout(statusTimeout);
+      statusTimeout = null;
+    }
+  }
+
+  window.addEventListener('beforeunload', e => {
+    if (isSubmitting) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+
+})();
+</script>
+
+</body>
+</html>

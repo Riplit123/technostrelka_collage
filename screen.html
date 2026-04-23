@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Технострелка 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  /* Локальный шрифт Bebas Neue из папки fonts/ */
+  @font-face {
+    font-family: 'Bebas Neue';
+    src: url('fonts/BebasNeue-Regular.woff2') format('woff2'),
+         url('fonts/BebasNeue-Regular.woff') format('woff'),
+         url('fonts/BebasNeue-Regular.ttf') format('truetype');
+    font-weight: 400 700;
+    font-style: normal;
+    font-display: block;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: 'Montserrat', sans-serif;
+  }
+
+  .hint {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #fff;
+    font-size: 28px;
+    font-weight: 300;
+    letter-spacing: 4px;
+    opacity: 0.7;
+    animation: pulse 2s infinite ease-in-out;
+    z-index: 100;
+    text-align: center;
+  }
+  .hint .sub {
+    display: block;
+    margin-top: 10px;
+    font-size: 14px;
+    letter-spacing: 2px;
+    opacity: 0.7;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 0.3; }
+    50% { opacity: 0.9; }
+  }
+
+  .stage {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+  }
+
+  .collage-wrap {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100vw;
+    height: 100vh;
+    transform: translate(-50%, -50%) scale(1);
+    transition: transform 4s cubic-bezier(.4,0,.2,1);
+    will-change: transform;
+    z-index: 3;
+  }
+
+  .collage {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  .photo {
+    position: absolute;
+    border-radius: 0;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    color: #fff;
+    overflow: hidden;
+    opacity: 0;
+    transform: translate(var(--fx), var(--fy)) rotate(var(--fr,0deg)) scale(0.4);
+    transition: transform 1.4s cubic-bezier(.2,.7,.2,1), opacity 0.6s ease;
+    will-change: transform, opacity;
+    background-size: cover;
+    background-position: center;
+  }
+  .photo.flying {
+    opacity: 1;
+    transform: translate(var(--tx), var(--ty)) rotate(var(--rot)) scale(1);
+  }
+
+  .photo.small {
+    font-size: 22px;
+    border-radius: 0;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+  }
+
+  .photo.tiny {
+    font-size: 14px;
+    border-radius: 0;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  }
+
+  /* Фиолетовый слой с маской-текстом. */
+  .purple-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 6;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 3.5s ease;
+  }
+  .purple-layer.visible { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="hint" id="hint">
+  НАЖМИТЕ ПРОБЕЛ
+  <span class="sub" id="hintSub">загрузка фото...</span>
+</div>
+
+<div class="stage">
+  <div class="collage-wrap" id="collageWrap">
+    <div class="collage" id="collage"></div>
+  </div>
+</div>
+
+<script>
+  // --- Fallback-заглушки (на случай, если реальных фото ещё нет) ---
+  const icons = ['🚀','⚙️','💡','🔧','🎓','📡','🛰️','🤖','⚗️','🔬','💻','📱','🎯','⚡','🌐','🛠️','📊','🔭','🧪','🎨','📸','🎬','🏆','🎮','🔌','🧲','📐','✏️','🖥️','🧮','🎧','🔔','🌟','🚁','🛸','🧬','⚛️','🔋','💾','📀','🎪','🎭','🎤','🎸','🎹','🏅','🥇','🧠','👾','🕹️'];
+  const gradients = [
+    'linear-gradient(135deg,#667eea,#764ba2)',
+    'linear-gradient(135deg,#f093fb,#f5576c)',
+    'linear-gradient(135deg,#4facfe,#00f2fe)',
+    'linear-gradient(135deg,#43e97b,#38f9d7)',
+    'linear-gradient(135deg,#fa709a,#fee140)',
+    'linear-gradient(135deg,#30cfd0,#330867)',
+    'linear-gradient(135deg,#a8edea,#fed6e3)',
+    'linear-gradient(135deg,#ff9a9e,#fecfef)',
+    'linear-gradient(135deg,#ffecd2,#fcb69f)',
+    'linear-gradient(135deg,#5ee7df,#b490ca)',
+    'linear-gradient(135deg,#f6d365,#fda085)',
+    'linear-gradient(135deg,#c471f5,#fa71cd)',
+    'linear-gradient(135deg,#48c6ef,#6f86d6)',
+    'linear-gradient(135deg,#f78ca0,#f9748f)',
+    'linear-gradient(135deg,#b721ff,#21d4fd)',
+    'linear-gradient(135deg,#ff6e7f,#bfe9ff)',
+    'linear-gradient(135deg,#e65c00,#f9d423)',
+    'linear-gradient(135deg,#11998e,#38ef7d)'
+  ];
+
+  // --- Пул реальных фото с сервера ---
+  // realPhotos: массив URL-адресов одобренных фото
+  const realPhotos = [];
+
+  async function loadApprovedPhotos() {
+    try {
+      const r = await fetch('/api/approved');
+      const data = await r.json();
+      if (data.ok && Array.isArray(data.items)) {
+        data.items.forEach(it => {
+          if (!realPhotos.includes(it.url)) realPhotos.push(it.url);
+        });
+      }
+    } catch (e) {
+      console.warn('Не удалось загрузить одобренные фото:', e);
+    }
+  }
+
+  // WebSocket: слушаем события об одобренных фото в реальном времени
+  function connectWS() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const url = `${proto}//${location.host}/?role=screen`;
+    const ws = new WebSocket(url);
+    ws.addEventListener('message', (ev) => {
+      let msg;
+      try { msg = JSON.parse(ev.data); } catch(_) { return; }
+      if (msg.type === 'approved' && msg.url) {
+        if (!realPhotos.includes(msg.url)) {
+          realPhotos.push(msg.url);
+          updateHintSub();
+        }
+      }
+    });
+    ws.addEventListener('close', () => {
+      setTimeout(connectWS, 1500);
+    });
+    ws.addEventListener('error', () => {
+      try { ws.close(); } catch(_) {}
+    });
+  }
+
+  function updateHintSub() {
+    const el = document.getElementById('hintSub');
+    if (!el) return;
+    if (realPhotos.length === 0) {
+      el.textContent = 'ждём первые фото участников...';
+    } else {
+      el.textContent = `фото загружено: ${realPhotos.length}`;
+    }
+  }
+
+  const collage = document.getElementById('collage');
+  const collageWrap = document.getElementById('collageWrap');
+  const hint = document.getElementById('hint');
+
+  const VW = window.innerWidth;
+  const VH = window.innerHeight;
+
+  // Фаза 1 — крупные
+  const BIG_COLS = 10;
+  const BIG_ROWS = 6;
+  const BIG_CELL_W = VW / BIG_COLS;
+  const BIG_CELL_H = VH / BIG_ROWS;
+  const BIG_TOTAL = BIG_COLS * BIG_ROWS;
+
+  // Фаза 2 — средние
+  const SMALL_COLS = 20;
+  const SMALL_ROWS = 12;
+  const SMALL_CELL_W = VW / SMALL_COLS;
+  const SMALL_CELL_H = VH / SMALL_ROWS;
+  const SMALL_TOTAL = SMALL_COLS * SMALL_ROWS;
+
+  // Фаза 3 — мелкие
+  const TINY_COLS = 36;
+  const TINY_ROWS = 22;
+  const TINY_CELL_W = VW / TINY_COLS;
+  const TINY_CELL_H = VH / TINY_ROWS;
+  const TINY_TOTAL = TINY_COLS * TINY_ROWS;
+
+  const photos = [];
+  const smallPhotos = [];
+  const tinyPhotos = [];
+
+  // Устанавливает содержимое плитки: либо реальное фото, либо fallback-эмодзи
+  function setPhotoContent(el) {
+    if (realPhotos.length > 0) {
+      // Берём случайное реальное фото
+      const url = realPhotos[Math.floor(Math.random() * realPhotos.length)];
+      el.style.backgroundImage = `url("${url}")`;
+      el.style.background = `#000 url("${url}") center/cover no-repeat`;
+      el.textContent = '';
+    } else {
+      // Fallback — эмодзи на градиенте
+      const icon = icons[Math.floor(Math.random() * icons.length)];
+      const grad = gradients[Math.floor(Math.random() * gradients.length)];
+      el.style.backgroundImage = '';
+      el.style.background = grad;
+      el.textContent = icon;
+    }
+  }
+
+  function createBigPhotos() {
+    for (let i = 0; i < BIG_TOTAL; i++) {
+      const row = Math.floor(i / BIG_COLS);
+      const col = i % BIG_COLS;
+      const tx = col * BIG_CELL_W - VW/2 + BIG_CELL_W/2;
+      const ty = row * BIG_CELL_H - VH/2 + BIG_CELL_H/2;
+
+      const el = document.createElement('div');
+      el.className = 'photo';
+      const w = BIG_CELL_W - 6;
+      const h = BIG_CELL_H - 6;
+      el.style.width = w + 'px';
+      el.style.height = h + 'px';
+      el.style.marginLeft = (-w/2) + 'px';
+      el.style.marginTop = (-h/2) + 'px';
+      el.style.left = '50%';
+      el.style.top = '50%';
+
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.max(VW, VH) + 400 + Math.random() * 500;
+      const fx = Math.cos(angle) * dist;
+      const fy = Math.sin(angle) * dist;
+      const fr = (Math.random() * 720 - 360) + 'deg';
+
+      el.style.setProperty('--fx', fx + 'px');
+      el.style.setProperty('--fy', fy + 'px');
+      el.style.setProperty('--fr', fr);
+      el.style.setProperty('--tx', tx + 'px');
+      el.style.setProperty('--ty', ty + 'px');
+      el.style.setProperty('--rot', (Math.random() * 8 - 4) + 'deg');
+
+      setPhotoContent(el);
+      collage.appendChild(el);
+      photos.push(el);
+    }
+  }
+
+  function createSmallPhotos() {
+    for (let i = 0; i < SMALL_TOTAL; i++) {
+      const row = Math.floor(i / SMALL_COLS);
+      const col = i % SMALL_COLS;
+      const tx = col * SMALL_CELL_W - VW/2 + SMALL_CELL_W/2;
+      const ty = row * SMALL_CELL_H - VH/2 + SMALL_CELL_H/2;
+
+      const el = document.createElement('div');
+      el.className = 'photo small';
+      const w = SMALL_CELL_W - 3;
+      const h = SMALL_CELL_H - 3;
+      el.style.width = w + 'px';
+      el.style.height = h + 'px';
+      el.style.marginLeft = (-w/2) + 'px';
+      el.style.marginTop = (-h/2) + 'px';
+      el.style.left = '50%';
+      el.style.top = '50%';
+
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.max(VW, VH) + 200;
+      const fx = Math.cos(angle) * dist;
+      const fy = Math.sin(angle) * dist;
+
+      el.style.setProperty('--fx', fx + 'px');
+      el.style.setProperty('--fy', fy + 'px');
+      el.style.setProperty('--fr', (Math.random()*360) + 'deg');
+      el.style.setProperty('--tx', tx + 'px');
+      el.style.setProperty('--ty', ty + 'px');
+      el.style.setProperty('--rot', (Math.random()*6-3) + 'deg');
+
+      setPhotoContent(el);
+      collage.appendChild(el);
+      smallPhotos.push(el);
+    }
+  }
+
+  function createTinyPhotos() {
+    for (let i = 0; i < TINY_TOTAL; i++) {
+      const row = Math.floor(i / TINY_COLS);
+      const col = i % TINY_COLS;
+      const tx = col * TINY_CELL_W - VW/2 + TINY_CELL_W/2;
+      const ty = row * TINY_CELL_H - VH/2 + TINY_CELL_H/2;
+
+      const el = document.createElement('div');
+      el.className = 'photo tiny';
+      const w = TINY_CELL_W - 1.5;
+      const h = TINY_CELL_H - 1.5;
+      el.style.width = w + 'px';
+      el.style.height = h + 'px';
+      el.style.marginLeft = (-w/2) + 'px';
+      el.style.marginTop = (-h/2) + 'px';
+      el.style.left = '50%';
+      el.style.top = '50%';
+
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.max(VW, VH) + 150;
+      const fx = Math.cos(angle) * dist;
+      const fy = Math.sin(angle) * dist;
+
+      el.style.setProperty('--fx', fx + 'px');
+      el.style.setProperty('--fy', fy + 'px');
+      el.style.setProperty('--fr', (Math.random()*360) + 'deg');
+      el.style.setProperty('--tx', tx + 'px');
+      el.style.setProperty('--ty', ty + 'px');
+      el.style.setProperty('--rot', (Math.random()*6-3) + 'deg');
+
+      setPhotoContent(el);
+      collage.appendChild(el);
+      tinyPhotos.push(el);
+    }
+  }
+
+  // Перед стартом подгружаем фото с сервера и открываем WS
+  (async () => {
+    await loadApprovedPhotos();
+    updateHintSub();
+    connectWS();
+    // Теперь строим коллаж — если сервер вернул фото, они уже попадут в ячейки
+    createBigPhotos();
+    createSmallPhotos();
+    createTinyPhotos();
+  })();
+
+  let started = false;
+
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && !started) {
+      started = true;
+      hint.style.display = 'none';
+      startAnimation();
+    }
+  });
+
+  let digitLayerOld = null;
+  let digitLayerNew = null;
+
+  async function startAnimation() {
+    // --- Фаза 1: крупные фото ---
+    const shuffled = [...photos].sort(() => Math.random() - 0.5);
+    const flyDuration = 9000;
+    shuffled.forEach((p, i) => {
+      const delay = (i / shuffled.length) * flyDuration * 0.85;
+      setTimeout(() => p.classList.add('flying'), delay);
+    });
+
+    setTimeout(() => {
+      setInterval(() => {
+        for (let k = 0; k < 3; k++) {
+          const rnd = photos[Math.floor(Math.random() * photos.length)];
+          rnd.style.transition = 'opacity 0.4s ease, transform 0.6s ease';
+          rnd.style.opacity = '0.3';
+          setTimeout(() => {
+            setPhotoContent(rnd);
+            rnd.style.opacity = '1';
+          }, 400);
+        }
+      }, 300);
+    }, 4000);
+
+    // --- Фаза 2: средние фото ---
+    await wait(9000);
+
+    const shuffledSmall = [...smallPhotos].sort(() => Math.random() - 0.5);
+    const smallFly = 5000;
+    shuffledSmall.forEach((p, i) => {
+      const delay = (i / shuffledSmall.length) * smallFly;
+      setTimeout(() => p.classList.add('flying'), delay);
+    });
+
+    setTimeout(() => {
+      setInterval(() => {
+        for (let k = 0; k < 5; k++) {
+          const rnd = smallPhotos[Math.floor(Math.random() * smallPhotos.length)];
+          rnd.style.transition = 'opacity 0.4s ease';
+          rnd.style.opacity = '0.3';
+          setTimeout(() => {
+            setPhotoContent(rnd);
+            rnd.style.opacity = '1';
+          }, 400);
+        }
+      }, 250);
+    }, 2000);
+
+    // --- Фаза 3: мелкие фото ---
+    await wait(4500);
+
+    const shuffledTiny = [...tinyPhotos].sort(() => Math.random() - 0.5);
+    const tinyFly = 4500;
+    shuffledTiny.forEach((p, i) => {
+      const delay = (i / shuffledTiny.length) * tinyFly;
+      setTimeout(() => p.classList.add('flying'), delay);
+    });
+
+    setTimeout(() => {
+      setInterval(() => {
+        for (let k = 0; k < 8; k++) {
+          const rnd = tinyPhotos[Math.floor(Math.random() * tinyPhotos.length)];
+          rnd.style.transition = 'opacity 0.3s ease';
+          rnd.style.opacity = '0.3';
+          setTimeout(() => {
+            setPhotoContent(rnd);
+            rnd.style.opacity = '1';
+          }, 300);
+        }
+      }, 200);
+    }, 2000);
+
+    // --- Фаза 4: фиолетовый фон + текст ---
+    await wait(2500);
+    applySvgMask();
+
+    await wait(200);
+    document.getElementById('purpleLayer').classList.add('visible');
+
+    // --- Фаза 5: смена последней цифры ---
+    await wait(4500);
+    await slideDigit('3');
+    await wait(1400);
+    await slideDigit('4');
+    await wait(1400);
+    await slideDigit('5');
+    await wait(1400);
+    await slideDigit('6');
+  }
+
+  const svgNS = "http://www.w3.org/2000/svg";
+
+  // Параметры текста
+  const YEAR_Y_PERCENT = 72;
+  const YEAR_FONT_SIZE = 260;
+  const TITLE_Y_PERCENT = 42;
+  const TITLE_FONT_SIZE = 220;
+  const TITLE_LETTER_SPACING = 6;
+
+  // Зазор между соседними цифрами года (в пикселях)
+  const DIGIT_GAP = 18;
+
+  function applySvgMask() {
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.id = 'purpleLayer';
+    svg.setAttribute('class', 'purple-layer');
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+
+    const defs = document.createElementNS(svgNS, 'defs');
+    const mask = document.createElementNS(svgNS, 'mask');
+    mask.setAttribute('id', 'textMask');
+
+    const rect = document.createElementNS(svgNS, 'rect');
+    rect.setAttribute('width', '100%');
+    rect.setAttribute('height', '100%');
+    rect.setAttribute('fill', 'white');
+    mask.appendChild(rect);
+
+    // Заголовок
+    const text1 = document.createElementNS(svgNS, 'text');
+    text1.setAttribute('x', '50%');
+    text1.setAttribute('y', TITLE_Y_PERCENT + '%');
+    text1.setAttribute('text-anchor', 'middle');
+    text1.setAttribute('font-family', '"Bebas Neue", sans-serif');
+    text1.setAttribute('font-weight', '700');
+    text1.setAttribute('font-size', TITLE_FONT_SIZE);
+    text1.setAttribute('letter-spacing', TITLE_LETTER_SPACING);
+    text1.setAttribute('fill', 'black');
+    text1.textContent = 'ТЕХНОСТРЕЛКА';
+    mask.appendChild(text1);
+
+    defs.appendChild(mask);
+    svg.appendChild(defs);
+
+        const overlayRect = document.createElementNS(svgNS, 'rect');
+    overlayRect.setAttribute('width', '100%');
+    overlayRect.setAttribute('height', '100%');
+    overlayRect.setAttribute('fill', '#4b2861');
+    overlayRect.setAttribute('mask', 'url(#textMask)');
+    svg.appendChild(overlayRect);
+
+    document.body.appendChild(svg);
+
+    // --- Год "202X" отдельными цифрами, чтобы уметь менять последнюю ---
+    const yearSvg = document.createElementNS(svgNS, 'svg');
+    yearSvg.id = 'yearSvg';
+    yearSvg.setAttribute('class', 'purple-layer');
+    yearSvg.setAttribute('width', '100%');
+    yearSvg.setAttribute('height', '100%');
+
+    const yearMaskDefs = document.createElementNS(svgNS, 'defs');
+    const yearMask = document.createElementNS(svgNS, 'mask');
+    yearMask.setAttribute('id', 'yearMask');
+
+    const yrect = document.createElementNS(svgNS, 'rect');
+    yrect.setAttribute('width', '100%');
+    yrect.setAttribute('height', '100%');
+    yrect.setAttribute('fill', 'white');
+    yearMask.appendChild(yrect);
+
+    // Измеряем ширину цифр, чтобы расположить их с равными зазорами
+    const measure = document.createElementNS(svgNS, 'svg');
+    measure.style.position = 'absolute';
+    measure.style.visibility = 'hidden';
+    measure.setAttribute('width', '0');
+    measure.setAttribute('height', '0');
+    document.body.appendChild(measure);
+
+    function measureDigit(ch) {
+      const t = document.createElementNS(svgNS, 'text');
+      t.setAttribute('font-family', '"Bebas Neue", sans-serif');
+      t.setAttribute('font-weight', '700');
+      t.setAttribute('font-size', YEAR_FONT_SIZE);
+      t.setAttribute('fill', 'black');
+      t.textContent = ch;
+      measure.appendChild(t);
+      const w = t.getComputedTextLength();
+      measure.removeChild(t);
+      return w;
+    }
+
+    const digits = ['2','0','2','6'];
+    const widths = digits.map(d => measureDigit(d));
+    const totalWidth = widths.reduce((a,b) => a+b, 0) + DIGIT_GAP * (digits.length - 1);
+
+    const startX = VW/2 - totalWidth/2;
+    const yearY = VH * (YEAR_Y_PERCENT / 100);
+
+    // Координаты центров каждой цифры
+    const digitCenters = [];
+    let acc = startX;
+    for (let i = 0; i < digits.length; i++) {
+      digitCenters.push(acc + widths[i]/2);
+      acc += widths[i] + DIGIT_GAP;
+    }
+
+    // Первые три цифры — статичные
+    for (let i = 0; i < 3; i++) {
+      const d = document.createElementNS(svgNS, 'text');
+      d.setAttribute('x', digitCenters[i]);
+      d.setAttribute('y', yearY);
+      d.setAttribute('text-anchor', 'middle');
+      d.setAttribute('font-family', '"Bebas Neue", sans-serif');
+      d.setAttribute('font-weight', '700');
+      d.setAttribute('font-size', YEAR_FONT_SIZE);
+      d.setAttribute('fill', 'black');
+      d.textContent = digits[i];
+      yearMask.appendChild(d);
+    }
+
+    // Последняя цифра — в отдельной группе с clip-path, чтобы анимировать "прокрутку"
+    const lastDigitCenterX = digitCenters[3];
+    const lastDigitW = widths[3];
+    const lastDigitH = YEAR_FONT_SIZE * 1.1;
+
+    // clip-окно вокруг последней цифры
+    const clip = document.createElementNS(svgNS, 'clipPath');
+    clip.setAttribute('id', 'lastDigitClip');
+    const clipRect = document.createElementNS(svgNS, 'rect');
+    clipRect.setAttribute('x', lastDigitCenterX - lastDigitW/2 - 10);
+    clipRect.setAttribute('y', yearY - lastDigitH + 30);
+    clipRect.setAttribute('width', lastDigitW + 20);
+    clipRect.setAttribute('height', lastDigitH);
+    clip.appendChild(clipRect);
+    yearMaskDefs.appendChild(clip);
+
+    // Группа, которая будет содержать старую и новую цифры при смене
+    const lastDigitGroup = document.createElementNS(svgNS, 'g');
+    lastDigitGroup.setAttribute('id', 'lastDigitGroup');
+    lastDigitGroup.setAttribute('clip-path', 'url(#lastDigitClip)');
+
+    // Начальная цифра "6"
+    const firstLast = document.createElementNS(svgNS, 'text');
+    firstLast.setAttribute('x', lastDigitCenterX);
+    firstLast.setAttribute('y', yearY);
+    firstLast.setAttribute('text-anchor', 'middle');
+    firstLast.setAttribute('font-family', '"Bebas Neue", sans-serif');
+    firstLast.setAttribute('font-weight', '700');
+    firstLast.setAttribute('font-size', YEAR_FONT_SIZE);
+    firstLast.setAttribute('fill', 'black');
+    firstLast.setAttribute('id', 'currentLastDigit');
+    firstLast.textContent = digits[3];
+    lastDigitGroup.appendChild(firstLast);
+
+    yearMask.appendChild(lastDigitGroup);
+    yearMaskDefs.appendChild(yearMask);
+    yearSvg.appendChild(yearMaskDefs);
+
+    const yearOverlay = document.createElementNS(svgNS, 'rect');
+    yearOverlay.setAttribute('width', '100%');
+    yearOverlay.setAttribute('height', '100%');
+    yearOverlay.setAttribute('fill', '#4b2861');
+    yearOverlay.setAttribute('mask', 'url(#yearMask)');
+    yearSvg.appendChild(yearOverlay);
+
+    document.body.appendChild(yearSvg);
+
+    // Показать сразу вместе с основным слоем
+    requestAnimationFrame(() => {
+      yearSvg.classList.add('visible');
+    });
+
+    // Сохраняем параметры для анимации цифр
+    window._yearParams = {
+      centerX: lastDigitCenterX,
+      y: yearY,
+      fontSize: YEAR_FONT_SIZE,
+      group: lastDigitGroup,
+      height: lastDigitH
+    };
+  }
+
+  // --- Анимация смены последней цифры года (прокрутка снизу вверх) ---
+  function slideDigit(newChar) {
+    return new Promise(resolve => {
+      const p = window._yearParams;
+      if (!p) { resolve(); return; }
+
+      const group = p.group;
+      const oldDigit = document.getElementById('currentLastDigit');
+      if (!oldDigit) { resolve(); return; }
+
+      // Новая цифра стартует снизу от окна
+      const newDigit = document.createElementNS(svgNS, 'text');
+      newDigit.setAttribute('x', p.centerX);
+      newDigit.setAttribute('y', p.y + p.height);
+      newDigit.setAttribute('text-anchor', 'middle');
+      newDigit.setAttribute('font-family', '"Bebas Neue", sans-serif');
+      newDigit.setAttribute('font-weight', '700');
+      newDigit.setAttribute('font-size', p.fontSize);
+      newDigit.setAttribute('fill', 'black');
+      newDigit.textContent = newChar;
+      group.appendChild(newDigit);
+
+      const duration = 1500;  // длительность анимации "прокрутки"
+      const startTime = performance.now();
+      const oldStartY = p.y;
+      const newStartY = p.y + p.height;
+      const oldEndY   = p.y - p.height;
+      const newEndY   = p.y;
+
+      function easeInOutCubic(t) {
+        return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+      }
+
+      function animate(now) {
+        const elapsed = now - startTime;
+        const t = Math.min(elapsed / duration, 1);
+        const e = easeInOutCubic(t);
+
+        oldDigit.setAttribute('y', oldStartY + (oldEndY - oldStartY) * e);
+        newDigit.setAttribute('y', newStartY + (newEndY - newStartY) * e);
+
+        if (t < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          // удаляем старую, назначаем новую текущей
+          oldDigit.remove();
+          newDigit.setAttribute('id', 'currentLastDigit');
+          resolve();
+        }
+      }
+      requestAnimationFrame(animate);
+    });
+  }
+
+  function wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+</script>
+
+</body>
+</html>

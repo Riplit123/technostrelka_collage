@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Технострелка — суперадмин</title>
+<style>
+  :root {
+    --bg:      #0a0710;
+    --card:    #1a1022;
+    --card2:   #241432;
+    --purple:  #7a3fa0;
+    --purple2: #a855f7;
+    --green:   #22c55e;
+    --yellow:  #eab308;
+    --red:     #ef4444;
+    --text:    #fff;
+    --muted:   #a79ab3;
+    --border:  rgba(255,255,255,0.08);
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at 50% 0%, #241432 0%, var(--bg) 70%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+
+  /* ---- Шапка ---- */
+  header {
+    position: sticky;
+    top: 0;
+    height: 72px;
+    padding: 0 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(10,6,14,0.85);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+    z-index: 10;
+  }
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+  .brand .title {
+    font-size: 14px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    opacity: 0.6;
+  }
+  .brand .main {
+    font-size: 22px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #d6b7ef, #fff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .conn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #555;
+    box-shadow: 0 0 8px #555;
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+  .dot.on  { background: var(--green); box-shadow: 0 0 10px var(--green); }
+  .dot.off { background: var(--red);   box-shadow: 0 0 10px var(--red); }
+
+  main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px;
+    display: grid;
+    gap: 24px;
+  }
+
+  /* ---- Сетка карточек ---- */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+  }
+
+  .card {
+    background: linear-gradient(135deg, var(--card), var(--card2));
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .card .label {
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .card .value {
+    font-size: 30px;
+    font-weight: 800;
+  }
+  .card .sub {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .card.accent .value { color: var(--purple2); }
+
+  /* Прогресс-бар по фото */
+  .progress {
+    width: 100%;
+    height: 8px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+  .progress .fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--purple), var(--purple2));
+    width: 0%;
+    transition: width 0.4s ease;
+    border-radius: 999px;
+  }
+  .progress .fill.warn   { background: linear-gradient(90deg, #ca8a04, var(--yellow)); }
+  .progress .fill.danger { background: linear-gradient(90deg, #b91c1c, var(--red)); }
+
+  /* ---- Секция управления ---- */
+  section.panel {
+    background: linear-gradient(135deg, var(--card), var(--card2));
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+  }
+  section.panel h2 {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 16px;
+    letter-spacing: 0.5px;
+  }
+
+  /* Переключатель */
+  .switch-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 14px 16px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+  .switch-row .info .t {
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .switch-row .info .s {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .switch {
+    position: relative;
+    width: 64px;
+    height: 34px;
+    flex-shrink: 0;
+  }
+  .switch input { display: none; }
+  .switch .slider {
+    position: absolute;
+    inset: 0;
+    background: #3a2145;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.25s ease;
+  }
+  .switch .slider::before {
+    content: '';
+    position: absolute;
+    left: 4px; top: 4px;
+    width: 26px; height: 26px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.25s ease;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  }
+  .switch input:checked + .slider { background: var(--green); }
+  .switch input:checked + .slider::before { transform: translateX(30px); }
+
+  /* Кнопка «снести всё» */
+  .danger-row {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 14px 16px;
+    background: rgba(239,68,68,0.08);
+    border-radius: 12px;
+    border: 1px solid rgba(239,68,68,0.3);
+  }
+  .btn-danger {
+    background: linear-gradient(135deg, #b91c1c, var(--red));
+    border: none;
+    color: #fff;
+    padding: 12px 22px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: transform 0.08s ease, box-shadow 0.2s ease;
+    white-space: nowrap;
+  }
+  .btn-danger:hover  { box-shadow: 0 8px 24px rgba(239,68,68,0.4); }
+  .btn-danger:active { transform: scale(0.98); }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translate(-50%, 40px);
+    background: #1f1530;
+    border: 1px solid var(--border);
+    color: #fff;
+    padding: 14px 22px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+    opacity: 0;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    z-index: 30;
+    pointer-events: none;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  .toast.ok  { border-color: rgba(34,197,94,0.4); }
+  .toast.err { border-color: rgba(239,68,68,0.5); }
+
+  /* Модалка подтверждения */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 40;
+    padding: 20px;
+  }
+  .modal-backdrop.show { display: flex; }
+  .modal {
+    background: linear-gradient(135deg, var(--card), var(--card2));
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    max-width: 440px;
+    width: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  }
+  .modal h3 {
+    font-size: 20px;
+    margin: 0 0 10px;
+  }
+  .modal p {
+    color: var(--muted);
+    margin: 0 0 20px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .modal .confirm-input {
+    width: 100%;
+    background: #0c0814;
+    border: 1px solid var(--border);
+    color: #fff;
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 15px;
+    margin-bottom: 16px;
+    font-family: monospace;
+  }
+  .modal .confirm-input:focus {
+    outline: none;
+    border-color: var(--red);
+  }
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+  }
+  .btn-secondary {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid var(--border);
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-secondary:hover { background: rgba(255,255,255,0.14); }
+
+  /* Адаптив */
+  @media (max-width: 640px) {
+    header { height: 56px; padding: 0 14px; }
+    .brand .title { font-size: 11px; letter-spacing: 2px; }
+    .brand .main { font-size: 16px; }
+    main { padding: 16px; gap: 16px; }
+    .card { padding: 16px; }
+    .card .value { font-size: 24px; }
+    section.panel { padding: 18px; }
+    .switch-row, .danger-row { flex-direction: column; align-items: stretch; gap: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="title">Суперадмин</div>
+    <div class="main">Технострелка</div>
+  </div>
+  <div class="conn">
+    <span class="dot off" id="connDot"></span>
+    <span id="connText">оффлайн</span>
+  </div>
+</header>
+
+<main>
+  <!-- ---- Статистика ---- -->
+  <div class="grid">
+
+    <div class="card accent">
+      <div class="label">Фото на сервере</div>
+      <div class="value"><span id="photoTotal">0</span> <span style="opacity:.4">/ <span id="photoLimit">200</span></span></div>
+      <div class="progress"><div class="fill" id="photoFill"></div></div>
+      <div class="sub">
+        одобрено: <span id="photoApproved">0</span> •
+        в очереди: <span id="photoPending">0</span> •
+        отклонено: <span id="photoRejected">0</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Подключено клиентов</div>
+      <div class="value" id="clientsTotal">0</div>
+      <div class="sub">
+        📱 участники: <span id="cliUpload">0</span> •
+        🛠 модераторы: <span id="cliAdmin">0</span> •
+        🖼 экраны: <span id="cliScreen">0</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Сервер</div>
+      <div class="value" id="uptime">—</div>
+      <div class="sub">Процесс: <span id="procUptime">—</span> • RAM: <span id="memUsage">—</span> МБ</div>
+    </div>
+
+    <div class="card">
+      <div class="label">Хранилище uploads</div>
+      <div class="value"><span id="storageMB">0</span> <span style="opacity:.4">МБ</span></div>
+      <div class="sub">Папка с исходниками фото</div>
+    </div>
+
+  </div>
+
+  <!-- ---- Панель управления ---- -->
+  <section class="panel">
+    <h2>⚙️ Управление</h2>
+
+    <div class="switch-row">
+      <div class="info">
+        <div class="t">Приём фото от участников</div>
+        <div class="s" id="uploadStateText">Загружается…</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="uploadsSwitch">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="danger-row">
+      <div class="info">
+        <div class="t" style="color:#fca5a5">🗑 Удалить все фото</div>
+        <div class="s">Очистит очередь, одобренные, файлы на диске. Необратимо.</div>
+      </div>
+      <button class="btn-danger" id="btnWipe">Стереть всё</button>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast">ok</div>
+
+<!-- Модалка подтверждения wipe -->
+<div class="modal-backdrop" id="wipeModal">
+  <div class="modal">
+    <h3>⚠️ Точно удалить все фото?</h3>
+    <p>
+      Будут стёрты: <b>все файлы в uploads/</b>, очередь модерации и одобренные фото.<br>
+      Коллаж на всех экранах очистится.<br><br>
+      Введите слово <b>СТЕРЕТЬ</b> чтобы подтвердить:
+    </p>
+    <input type="text" class="confirm-input" id="wipeConfirm" placeholder="СТЕРЕТЬ" autocomplete="off">
+    <div class="modal-actions">
+      <button class="btn-secondary" id="wipeCancel">Отмена</button>
+      <button class="btn-danger"    id="wipeYes" disabled>Да, стереть</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // =====================================================
+  //   СЕКРЕТ ИЗ URL
+  // =====================================================
+  // URL: /superadmin/root-9xQ2k
+  const m = location.pathname.match(/^\/superadmin\/([^\/]+)/);
+  const SECRET = m ? decodeURIComponent(m[1]) : null;
+
+  if (!SECRET) {
+    document.body.innerHTML =
+      '<div style="padding:40px;font-family:sans-serif;color:#fff;">Неверная ссылка.</div>';
+    throw new Error('no secret');
+  }
+
+  // ---- DOM ----
+  const $ = (id) => document.getElementById(id);
+
+  const photoTotal    = $('photoTotal');
+  const photoLimit    = $('photoLimit');
+  const photoFill     = $('photoFill');
+  const photoApproved = $('photoApproved');
+  const photoPending  = $('photoPending');
+  const photoRejected = $('photoRejected');
+
+  const clientsTotal  = $('clientsTotal');
+  const cliUpload     = $('cliUpload');
+  const cliAdmin      = $('cliAdmin');
+  const cliScreen     = $('cliScreen');
+
+  const uptimeEl      = $('uptime');
+  const procUptimeEl  = $('procUptime');
+  const memUsageEl    = $('memUsage');
+  const storageMB     = $('storageMB');
+
+  const connDot       = $('connDot');
+  const connText      = $('connText');
+
+  const uploadsSwitch = $('uploadsSwitch');
+  const uploadStateTx = $('uploadStateText');
+
+  const btnWipe       = $('btnWipe');
+  const wipeModal     = $('wipeModal');
+  const wipeConfirm   = $('wipeConfirm');
+  const wipeCancel    = $('wipeCancel');
+  const wipeYes       = $('wipeYes');
+
+  const toastEl       = $('toast');
+
+  // =====================================================
+  //   ВСПОМОГАТЕЛЬНЫЕ
+  // =====================================================
+  function toast(text, kind) {
+    toastEl.textContent = text;
+    toastEl.className = 'toast show' + (kind ? ' ' + kind : '');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => toastEl.classList.remove('show'), 2500);
+  }
+
+  function fmtDuration(ms) {
+    const s = Math.floor(ms / 1000);
+    const d = Math.floor(s / 86400);
+    const h = Math.floor((s % 86400) / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const ss = s % 60;
+    if (d > 0) return `${d}д ${h}ч ${m}м`;
+    if (h > 0) return `${h}ч ${m}м`;
+    if (m > 0) return `${m}м ${ss}с`;
+    return `${ss}с`;
+  }
+
+  async function apiGet(path) {
+    const url = path + (path.includes('?') ? '&' : '?') + 'secret=' + encodeURIComponent(SECRET);
+    const r = await fetch(url);
+    return r.json();
+  }
+
+  async function apiPost(path, body) {
+    const url = path + '?secret=' + encodeURIComponent(SECRET);
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Superadmin': SECRET },
+      body: JSON.stringify(body || {})
+    });
+    return r.json();
+  }
+
+  // =====================================================
+  //   ОТРИСОВКА СТАТИСТИКИ
+  // =====================================================
+  let lastStats = null;
+
+  function renderStats(s) {
+    lastStats = s;
+
+    photoTotal.textContent    = s.photo.total;
+    photoLimit.textContent    = s.photo.limit;
+    photoApproved.textContent = s.photo.approved;
+    photoPending.textContent  = s.photo.pending;
+    photoRejected.textContent = s.photo.rejectedSinceStart;
+
+    const pct = Math.min(100, (s.photo.total / s.photo.limit) * 100);
+    photoFill.style.width = pct + '%';
+    photoFill.classList.remove('warn', 'danger');
+    if (pct >= 90)      photoFill.classList.add('danger');
+    else if (pct >= 70) photoFill.classList.add('warn');
+
+    const total = s.clients.uploader + s.clients.admin + s.clients.screen + s.clients.superadmin;
+    clientsTotal.textContent = total;
+    cliUpload .textContent = s.clients.uploader;
+    cliAdmin  .textContent = s.clients.admin;
+    cliScreen .textContent = s.clients.screen;
+
+    uptimeEl    .textContent = fmtDuration(s.uptimeMs);
+    procUptimeEl.textContent = fmtDuration(s.processUptimeS * 1000);
+    memUsageEl  .textContent = s.memoryMB;
+
+    storageMB.textContent = s.storage.mb;
+
+    // Свич
+    uploadsSwitch.checked = !!s.uploadsEnabled;
+    uploadStateTx.textContent = s.uploadsEnabled
+      ? 'Включено — участники могут загружать фото'
+      : 'Выключено — кнопка загрузки заблокирована у всех';
+  }
+
+  async function loadStats() {
+    try {
+      const d = await apiGet('/api/super/stats');
+      if (d.ok) renderStats(d);
+      else toast('Нет доступа', 'err');
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  // =====================================================
+  //   СВИЧ «ПРИЁМ ФОТО»
+  // =====================================================
+  uploadsSwitch.addEventListener('change', async () => {
+    const want = uploadsSwitch.checked;
+    uploadsSwitch.disabled = true;
+    try {
+      const d = await apiPost('/api/super/uploads-toggle', { enabled: want });
+      if (d.ok) {
+        toast(d.enabled ? '✓ Приём включён' : '⏸ Приём выключен', 'ok');
+        if (lastStats) { lastStats.uploadsEnabled = d.enabled; renderStats(lastStats); }
+      } else {
+        uploadsSwitch.checked = !want;
+        toast('Ошибка', 'err');
+      }
+    } catch (e) {
+      uploadsSwitch.checked = !want;
+      toast('Сеть недоступна', 'err');
+    } finally {
+      uploadsSwitch.disabled = false;
+    }
+  });
+
+  // =====================================================
+  //   КНОПКА «СТЕРЕТЬ ВСЁ» С ДВОЙНЫМ ПОДТВЕРЖДЕНИЕМ
+  // =====================================================
+  btnWipe.addEventListener('click', () => {
+    wipeConfirm.value = '';
+    wipeYes.disabled = true;
+    wipeModal.classList.add('show');
+    setTimeout(() => wipeConfirm.focus(), 50);
+  });
+  wipeCancel.addEventListener('click', () => wipeModal.classList.remove('show'));
+  wipeModal.addEventListener('click', (e) => {
+    if (e.target === wipeModal) wipeModal.classList.remove('show');
+  });
+  wipeConfirm.addEventListener('input', () => {
+    wipeYes.disabled = wipeConfirm.value.trim().toUpperCase() !== 'СТЕРЕТЬ';
+  });
+  wipeYes.addEventListener('click', async () => {
+    wipeYes.disabled = true;
+    wipeCancel.disabled = true;
+    try {
+      const d = await apiPost('/api/super/wipe');
+      if (d.ok) {
+        toast('🗑 Все фото удалены', 'ok');
+        wipeModal.classList.remove('show');
+        loadStats();
+      } else {
+        toast('Ошибка: ' + (d.error || '?'), 'err');
+      }
+    } catch (e) {
+      toast('Сеть недоступна', 'err');
+    } finally {
+      wipeYes.disabled = false;
+      wipeCancel.disabled = false;
+    }
+  });
+
+  // =====================================================
+  //   WEBSOCKET
+  // =====================================================
+  let ws = null;
+  let reconnectTimer = null;
+
+  function connectWS() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const url = `${proto}//${location.host}/?role=superadmin&token=${encodeURIComponent(SECRET)}`;
+    ws = new WebSocket(url);
+
+    ws.addEventListener('open', () => {
+      connDot.className = 'dot on';
+      connText.textContent = 'онлайн';
+    });
+
+    ws.addEventListener('close', () => {
+      connDot.className = 'dot off';
+      connText.textContent = 'оффлайн';
+      clearTimeout(reconnectTimer);
+      reconnectTimer = setTimeout(connectWS, 1500);
+    });
+
+        ws.addEventListener('error', () => {
+      try { ws.close(); } catch(_) {}
+    });
+
+    ws.addEventListener('message', (ev) => {
+      let msg;
+      try { msg = JSON.parse(ev.data); } catch(_) { return; }
+
+      switch (msg.type) {
+        // Любое изменение статистики — перезапросим цифры
+        case 'stats_changed':
+        case 'clients_changed':
+        case 'new_pending':
+        case 'moderated':
+        case 'approved':
+        case 'wipe':
+          loadStats();
+          break;
+
+        // Изменился свич — обновим UI без запроса
+        case 'uploads_state':
+          uploadsSwitch.checked = !!msg.enabled;
+          uploadStateTx.textContent = msg.enabled
+            ? 'Включено — участники могут загружать фото'
+            : 'Выключено — кнопка загрузки заблокирована у всех';
+          if (lastStats) {
+            lastStats.uploadsEnabled = !!msg.enabled;
+          }
+          break;
+      }
+    });
+  }
+
+  // =====================================================
+  //   СТАРТ
+  // =====================================================
+  loadStats();
+  connectWS();
+
+  // Периодически обновляем uptime/память (на случай, если событий нет)
+  setInterval(loadStats, 5000);
+
+  // Esc закрывает модалку
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') wipeModal.classList.remove('show');
+  });
+</script>
+</body>
+</html>

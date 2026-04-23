@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Технострелка 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  @font-face {
+    font-family: 'Bebas Neue';
+    src: url('fonts/BebasNeue-Regular.woff2') format('woff2'),
+         url('fonts/BebasNeue-Regular.woff') format('woff'),
+         url('fonts/BebasNeue-Regular.ttf') format('truetype');
+    font-weight: 400 700;
+    font-style: normal;
+    font-display: block;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: 'Montserrat', sans-serif;
+    cursor: none; /* скрываем курсор — это большой экран */
+  }
+
+  /* =============== ИНТРО-ВИДЕО =============== */
+  .intro-video {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: #000;
+    z-index: 200;
+    opacity: 1;
+    transition: opacity 0.5s ease;
+    pointer-events: none;
+  }
+  .intro-video.hidden {
+    opacity: 0;
+  }
+  .intro-video::-webkit-media-controls,
+  .intro-video::-webkit-media-controls-panel,
+  .intro-video::-webkit-media-controls-start-playback-button {
+    display: none !important;
+    -webkit-appearance: none;
+  }
+
+  /* =============== ФИНАЛЬНОЕ ЧЁРНОЕ ЗАТЕМНЕНИЕ =============== */
+  .final-fade {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    z-index: 300;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 1.2s ease;
+  }
+  .final-fade.visible {
+    opacity: 1;
+  }
+
+  /* =============== КОЛЛАЖ =============== */
+  .stage {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+  }
+
+  .collage-wrap {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100vw;
+    height: 100vh;
+    transform: translate(-50%, -50%) scale(1);
+    transition: transform 4s cubic-bezier(.4,0,.2,1);
+    will-change: transform;
+    z-index: 3;
+  }
+
+  .collage {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  .photo {
+    position: absolute;
+    border-radius: 0;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    color: #fff;
+    overflow: hidden;
+    opacity: 0;
+    transform: translate(var(--fx), var(--fy)) rotate(var(--fr,0deg)) scale(0.4);
+    /* Ускорено: 3.2s -> 2.0s, 1.1s -> 0.8s */
+    transition: transform 2.0s cubic-bezier(.2,.7,.2,1), opacity 0.8s ease;
+    will-change: transform, opacity;
+    background-size: cover;
+    background-position: center;
+  }
+  .photo.flying {
+    opacity: 1;
+    transform: translate(var(--tx), var(--ty)) rotate(var(--rot)) scale(1);
+  }
+
+  .photo.small {
+    font-size: 22px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+    /* Быстрее */
+    transition: transform 1.7s cubic-bezier(.2,.7,.2,1), opacity 0.7s ease;
+  }
+
+  .photo.tiny {
+    font-size: 16px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    /* Было 3.8s -> 1.6s, 1.2s -> 0.7s */
+    transition: transform 1.6s cubic-bezier(.2,.7,.2,1), opacity 0.7s ease;
+  }
+
+  /* Фиолетовый слой с маской */
+  .purple-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 6;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 3s ease; /* было 4s */
+  }
+  .purple-layer.visible { opacity: 1; }
+
+  /* Канвас для конфетти */
+  #confetti {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<!-- Интро-видео (на весь экран, без контролов) -->
+<video class="intro-video" id="introVideo"
+       autoplay muted playsinline loop
+       preload="auto"
+       disablepictureinpicture
+       disableremoteplayback
+       controlslist="nodownload noplaybackrate nofullscreen"
+       x-webkit-airplay="deny">
+  <source src="video/intro.mp4" type="video/mp4">
+</video>
+
+<!-- Финальное чёрное затемнение -->
+<div class="final-fade" id="finalFade"></div>
+
+<div class="stage">
+  <div class="collage-wrap" id="collageWrap">
+    <div class="collage" id="collage"></div>
+  </div>
+</div>
+
+<canvas id="confetti"></canvas>
+
+<script>
+  // --- Fallback-заглушки ---
+  const icons = ['🚀','⚙️','💡','🔧','🎓','📡','🛰️','🤖','⚗️','🔬','💻','📱','🎯','⚡','🌐','🛠️','📊','🔭','🧪','🎨','📸','🎬','🏆','🎮','🔌','🧲','📐','✏️','🖥️','🧮','🎧','🔔','🌟','🚁','🛸','🧬','⚛️','🔋','💾','📀','🎪','🎭','🎤','🎸','🎹','🏅','🥇','🧠','👾','🕹️'];
+  const gradients = [
+    'linear-gradient(135deg,#667eea,#764ba2)',
+    'linear-gradient(135deg,#f093fb,#f5576c)',
+    'linear-gradient(135deg,#4facfe,#00f2fe)',
+    'linear-gradient(135deg,#43e97b,#38f9d7)',
+    'linear-gradient(135deg,#fa709a,#fee140)',
+    'linear-gradient(135deg,#30cfd0,#330867)',
+    'linear-gradient(135deg,#a8edea,#fed6e3)',
+    'linear-gradient(135deg,#ff9a9e,#fecfef)',
+    'linear-gradient(135deg,#ffecd2,#fcb69f)',
+    'linear-gradient(135deg,#5ee7df,#b490ca)',
+    'linear-gradient(135deg,#f6d365,#fda085)',
+    'linear-gradient(135deg,#c471f5,#fa71cd)',
+    'linear-gradient(135deg,#48c6ef,#6f86d6)',
+    'linear-gradient(135deg,#f78ca0,#f9748f)',
+    'linear-gradient(135deg,#b721ff,#21d4fd)',
+    'linear-gradient(135deg,#ff6e7f,#bfe9ff)',
+    'linear-gradient(135deg,#e65c00,#f9d423)',
+    'linear-gradient(135deg,#11998e,#38ef7d)'
+  ];
+
+  const realPhotos = [];
+
+  async function loadApprovedPhotos() {
+    try {
+      const r = await fetch('/api/approved');
+      const data = await r.json();
+      if (data.ok && Array.isArray(data.items)) {
+        data.items.forEach(it => {
+          if (!realPhotos.includes(it.url)) realPhotos.push(it.url);
+        });
+      }
+    } catch (e) {
+      console.warn('Не удалось загрузить одобренные фото:', e);
+    }
+  }
+
+  function connectWS() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const url = `${proto}//${location.host}/?role=screen`;
+    const ws = new WebSocket(url);
+    ws.addEventListener('message', (ev) => {
+      let msg;
+      try { msg = JSON.parse(ev.data); } catch(_) { return; }
+      if (msg.type === 'approved' && msg.url) {
+        if (!realPhotos.includes(msg.url)) {
+          realPhotos.push(msg.url);
+        }
+      }
+      if (msg.type === 'wipe') {
+        realPhotos.length = 0;
+      }
+    });
+    ws.addEventListener('close', () => setTimeout(connectWS, 1500));
+    ws.addEventListener('error', () => { try { ws.close(); } catch(_) {} });
+  }
+
+  const collage = document.getElementById('collage');
+  const introVideo = document.getElementById('introVideo');
+  const finalFade = document.getElementById('finalFade');
+
+  const VW = window.innerWidth;
+  const VH = window.innerHeight;
+
+  const BIG_COLS = 10;
+  const BIG_ROWS = 6;
+  const BIG_CELL_W = VW / BIG_COLS;
+  const BIG_CELL_H = VH / BIG_ROWS;
+  const BIG_TOTAL = BIG_COLS * BIG_ROWS;
+
+  const SMALL_COLS = 20;
+  const SMALL_ROWS = 12;
+  const SMALL_CELL_W = VW / SMALL_COLS;
+  const SMALL_CELL_H = VH / SMALL_ROWS;
+  const SMALL_TOTAL = SMALL_COLS * SMALL_ROWS;
+
+  const TINY_COLS = 28;
+  const TINY_ROWS = 17;
+  const TINY_CELL_W = VW / TINY_COLS;
+  const TINY_CELL_H = VH / TINY_ROWS;
+  const TINY_TOTAL = TINY_COLS * TINY_ROWS;
+
+  const photos = [];
+  const smallPhotos = [];
+  const tinyPhotos = [];
+
+  function setPhotoContent(el) {
+    if (realPhotos.length > 0) {
+      const url = realPhotos[Math.floor(Math.random() * realPhotos.length)];
+      el.style.background = `#000 url("${url}") center/cover no-repeat`;
+      el.textContent = '';
+    } else {
+      const icon = icons[Math.floor(Math.random() * icons.length)];
+      const grad = gradients[Math.floor(Math.random() * gradients.length)];
+      el.style.background = grad;
+      el.textContent = icon;
+    }
+  }
+
+  function createBigPhotos() {
+    for (let i = 0; i < BIG_TOTAL; i++) {
+      const row = Math.floor(i / BIG_COLS);
+      const col = i % BIG_COLS;
+      const tx = col * BIG_CELL_W - VW/2 + BIG_CELL_W/2;
+      const ty = row * BIG_CELL_H - VH/2 + BIG_CELL_H/2;
+
+      const el = document.createElement('div');
+      el.className = 'photo';
+      const w = BIG_CELL_W - 6;
+      const h = BIG_CELL_H - 6;
+      el.style.width = w + 'px';
+      el.style.height = h + 'px';
+      el.style.marginLeft = (-w/2) + 'px';
+      el.style.marginTop = (-h/2) + 'px';
+      el.style.left = '50%';
+      el.style.top = '50%';
+
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.max(VW, VH) + 400 + Math.random() * 500;
+      const fx = Math.cos(angle) * dist;
+      const fy = Math.sin(angle) * dist;
+      const fr = (Math.random() * 720 - 360) + 'deg';
+
+      el.style.setProperty('--fx', fx + 'px');
+      el.style.setProperty('--fy', fy + 'px');
+      el.style.setProperty('--fr', fr);
+      el.style.setProperty('--tx', tx + 'px');
+      el.style.setProperty('--ty', ty + 'px');
+      el.style.setProperty('--rot', (Math.random() * 8 - 4) + 'deg');
+
+      setPhotoContent(el);
+      collage.appendChild(el);
+      photos.push(el);
+    }
+  }
+
+  function createSmallPhotos() {
+    for (let i = 0; i < SMALL_TOTAL; i++) {
+      const row = Math.floor(i / SMALL_COLS);
+      const col = i % SMALL_COLS;
+      const tx = col * SMALL_CELL_W - VW/2 + SMALL_CELL_W/2;
+      const ty = row * SMALL_CELL_H - VH/2 + SMALL_CELL_H/2;
+
+      const el = document.createElement('div');
+      el.className = 'photo small';
+      const w = SMALL_CELL_W - 3;
+      const h = SMALL_CELL_H - 3;
+      el.style.width = w + 'px';
+      el.style.height = h + 'px';
+      el.style.marginLeft = (-w/2) + 'px';
+      el.style.marginTop = (-h/2) + 'px';
+      el.style.left = '50%';
+      el.style.top = '50%';
+
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.max(VW, VH) + 200;
+      const fx = Math.cos(angle) * dist;
+      const fy = Math.sin(angle) * dist;
+
+      el.style.setProperty('--fx', fx + 'px');
+      el.style.setProperty('--fy', fy + 'px');
+      el.style.setProperty('--fr', (Math.random()*360) + 'deg');
+      el.style.setProperty('--tx', tx + 'px');
+      el.style.setProperty('--ty', ty + 'px');
+      el.style.setProperty('--rot', (Math.random()*6-3) + 'deg');
+
+      setPhotoContent(el);
+      collage.appendChild(el);
+      smallPhotos.push(el);
+    }
+  }
+
+  function createTinyPhotos() {
+    for (let i = 0; i < TINY_TOTAL; i++) {
+      const row = Math.floor(i / TINY_COLS);
+      const col = i % TINY_COLS;
+      const tx = col * TINY_CELL_W - VW/2 + TINY_CELL_W/2;
+      const ty = row * TINY_CELL_H - VH/2 + TINY_CELL_H/2;
+
+      const el = document.createElement('div');
+      el.className = 'photo tiny';
+      const w = TINY_CELL_W - 2;
+      const h = TINY_CELL_H - 2;
+      el.style.width = w + 'px';
+      el.style.height = h + 'px';
+      el.style.marginLeft = (-w/2) + 'px';
+      el.style.marginTop = (-h/2) + 'px';
+      el.style.left = '50%';
+      el.style.top = '50%';
+
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.max(VW, VH) + 150;
+      const fx = Math.cos(angle) * dist;
+      const fy = Math.sin(angle) * dist;
+
+      el.style.setProperty('--fx', fx + 'px');
+      el.style.setProperty('--fy', fy + 'px');
+      el.style.setProperty('--fr', (Math.random()*360) + 'deg');
+      el.style.setProperty('--tx', tx + 'px');
+      el.style.setProperty('--ty', ty + 'px');
+      el.style.setProperty('--rot', (Math.random()*6-3) + 'deg');
+
+      setPhotoContent(el);
+      collage.appendChild(el);
+      tinyPhotos.push(el);
+    }
+  }
+
+  (async () => {
+    await loadApprovedPhotos();
+    connectWS();
+    createBigPhotos();
+    createSmallPhotos();
+    createTinyPhotos();
+
+    // Гарантируем автоплей видео (на некоторых браузерах нужно)
+    try {
+      const p = introVideo.play();
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch(_) {}
+  })();
+
+  // =====================================================
+  //  УПРАВЛЕНИЕ СОСТОЯНИЯМИ
+  //  phase: 'intro' -> 'collage' -> 'done' -> 'faded'
+  // =====================================================
+  let phase = 'intro';
+  let confettiFinished = false;
+
+  document.addEventListener('keydown', (e) => {
+    if (e.code !== 'Space') return;
+    e.preventDefault();
+
+    if (phase === 'intro') {
+      phase = 'collage';
+      transitionFromIntroToCollage();
+    } else if (phase === 'done' && confettiFinished) {
+      phase = 'faded';
+      fadeToBlack();
+    }
+  });
+
+  function transitionFromIntroToCollage() {
+    // Плавное затемнение видео
+    introVideo.classList.add('hidden');
+    setTimeout(() => {
+      try { introVideo.pause(); } catch(_) {}
+      introVideo.style.display = 'none';
+      startAnimation();
+    }, 500);
+  }
+
+  function fadeToBlack() {
+    finalFade.classList.add('visible');
+    // После затемнения можно убрать всё лишнее
+    setTimeout(() => {
+      try {
+        document.getElementById('collageWrap').style.display = 'none';
+        const pl = document.getElementById('purpleLayer');
+        if (pl) pl.style.display = 'none';
+        const cc = document.getElementById('confetti');
+        if (cc) cc.style.display = 'none';
+      } catch(_) {}
+    }, 1300);
+  }
+
+  // =====================================================
+  //   ОСНОВНАЯ АНИМАЦИЯ (ускорена)
+  // =====================================================
+  async function startAnimation() {
+    // =========================================================
+    //   ФАЗА 1: КРУПНЫЕ ФОТО (было 26000 -> 16000)
+    // =========================================================
+    const shuffled = [...photos].sort(() => Math.random() - 0.5);
+    const flyDuration = 16000;
+    shuffled.forEach((p, i) => {
+      const delay = (i / shuffled.length) * flyDuration * 0.9;
+      setTimeout(() => p.classList.add('flying'), delay);
+    });
+
+    setTimeout(() => {
+      setInterval(() => {
+        const rnd = photos[Math.floor(Math.random() * photos.length)];
+        rnd.style.transition = 'opacity 0.7s ease, transform 0.7s ease';
+        rnd.style.opacity = '0.3';
+        setTimeout(() => {
+          setPhotoContent(rnd);
+          rnd.style.opacity = '1';
+        }, 700);
+      }, 900);
+    }, 7000);
+
+    // =========================================================
+    //   ФАЗА 2: СРЕДНИЕ (было wait 28000 / dur 14000)
+    // =========================================================
+    await wait(17000);
+    const shuffledSmall = [...smallPhotos].sort(() => Math.random() - 0.5);
+    const smallDuration = 9000;
+    shuffledSmall.forEach((p, i) => {
+      const delay = (i / shuffledSmall.length) * smallDuration;
+      setTimeout(() => p.classList.add('flying'), delay);
+    });
+
+    setTimeout(() => {
+      setInterval(() => {
+        for (let k = 0; k < 2; k++) {
+          const rnd = smallPhotos[Math.floor(Math.random() * smallPhotos.length)];
+          rnd.style.transition = 'opacity 0.55s ease';
+          rnd.style.opacity = '0.3';
+          setTimeout(() => {
+            setPhotoContent(rnd);
+            rnd.style.opacity = '1';
+          }, 550);
+        }
+      }, 500);
+    }, 3500);
+
+    // =========================================================
+    //   ФАЗА 3: МЕЛКИЕ (было wait 14000 / dur 18000)
+    // =========================================================
+    await wait(9000);
+    const shuffledTiny = [...tinyPhotos].sort(() => Math.random() - 0.5);
+    const tinyDuration = 10000;
+    shuffledTiny.forEach((p, i) => {
+      const delay = (i / shuffledTiny.length) * tinyDuration;
+      setTimeout(() => p.classList.add('flying'), delay);
+    });
+
+    setTimeout(() => {
+      setInterval(() => {
+        for (let k = 0; k < 2; k++) {
+          const rnd = tinyPhotos[Math.floor(Math.random() * tinyPhotos.length)];
+          rnd.style.transition = 'opacity 0.5s ease';
+          rnd.style.opacity = '0.35';
+          setTimeout(() => {
+            setPhotoContent(rnd);
+            rnd.style.opacity = '1';
+          }, 500);
+        }
+      }, 450);
+    }, 4000);
+
+    // =========================================================
+    //   ФАЗА 4: ФИОЛЕТОВЫЙ СЛОЙ + ТЕКСТ (было wait 10000 -> 6000)
+    // =========================================================
+    await wait(6000);
+    applySvgMask();
+
+    await wait(300);
+    document.getElementById('purpleLayer').classList.add('visible');
+
+    // =========================================================
+    //   ФАЗА 5: 2022 → 2023 → 2024 → 2025 → 2026
+    //   (wait 6500 -> 4000, между цифрами 1800 -> 1200)
+    // =========================================================
+    await wait(4000);
+    await slideDigit('3');
+    await wait(1200);
+    await slideDigit('4');
+    await wait(1200);
+    await slideDigit('5');
+    await wait(1200);
+    await slideDigit('6');
+
+    // =========================================================
+    //   ФАЗА 6: КОНФЕТТИ
+    // =========================================================
+    await wait(400);
+    launchConfetti();
+  }
+
+  const svgNS = "http://www.w3.org/2000/svg";
+
+  const YEAR_Y_PERCENT    = 80;
+  const YEAR_FONT_SIZE    = 300;
+  const TITLE_Y_PERCENT   = 42;
+  const TITLE_FONT_SIZE   = 300;
+  const TITLE_LETTER_SPACING = 6;
+  const DIGIT_GAP = 18;
+
+    const STROKE_WIDTH = 2.5;
+  const GLOW_BLUR    = 6;
+
+  function applySvgMask() {
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.id = 'purpleLayer';
+    svg.setAttribute('class', 'purple-layer');
+    svg.setAttribute('width',  '100%');
+    svg.setAttribute('height', '100%');
+    svg.setAttribute('viewBox', `0 0 ${VW} ${VH}`);
+    svg.setAttribute('preserveAspectRatio', 'none');
+
+    const defs = document.createElementNS(svgNS, 'defs');
+
+    // --- Фильтр для белой обводки + свечения ---
+    const filter = document.createElementNS(svgNS, 'filter');
+    filter.setAttribute('id', 'textGlow');
+    filter.setAttribute('x', '-20%');
+    filter.setAttribute('y', '-20%');
+    filter.setAttribute('width', '140%');
+    filter.setAttribute('height', '140%');
+
+    const feBlur = document.createElementNS(svgNS, 'feGaussianBlur');
+    feBlur.setAttribute('in', 'SourceGraphic');
+    feBlur.setAttribute('stdDeviation', GLOW_BLUR);
+    feBlur.setAttribute('result', 'blur');
+    filter.appendChild(feBlur);
+
+    const feMerge = document.createElementNS(svgNS, 'feMerge');
+    const m1 = document.createElementNS(svgNS, 'feMergeNode');
+    m1.setAttribute('in', 'blur');
+    const m2 = document.createElementNS(svgNS, 'feMergeNode');
+    m2.setAttribute('in', 'blur');
+    const m3 = document.createElementNS(svgNS, 'feMergeNode');
+    m3.setAttribute('in', 'SourceGraphic');
+    feMerge.appendChild(m1);
+    feMerge.appendChild(m2);
+    feMerge.appendChild(m3);
+    filter.appendChild(feMerge);
+
+    defs.appendChild(filter);
+
+    // --- Маска ---
+    const mask = document.createElementNS(svgNS, 'mask');
+    mask.setAttribute('id', 'textMask');
+    mask.setAttribute('maskUnits', 'userSpaceOnUse');
+    mask.setAttribute('x', '0');
+    mask.setAttribute('y', '0');
+    mask.setAttribute('width', VW);
+    mask.setAttribute('height', VH);
+
+    const bg = document.createElementNS(svgNS, 'rect');
+    bg.setAttribute('x', 0);
+    bg.setAttribute('y', 0);
+    bg.setAttribute('width', VW);
+    bg.setAttribute('height', VH);
+    bg.setAttribute('fill', 'white');
+    mask.appendChild(bg);
+
+    // Заголовок (вырез в маске)
+    const title = document.createElementNS(svgNS, 'text');
+    title.setAttribute('x', VW / 2);
+    title.setAttribute('y', VH * (TITLE_Y_PERCENT / 100));
+    title.setAttribute('text-anchor', 'middle');
+    title.setAttribute('font-family', '"Bebas Neue", sans-serif');
+    title.setAttribute('font-weight', '700');
+    title.setAttribute('font-size', TITLE_FONT_SIZE);
+    title.setAttribute('letter-spacing', TITLE_LETTER_SPACING);
+    title.setAttribute('fill', 'black');
+    title.textContent = 'ТЕХНОСТРЕЛКА';
+    mask.appendChild(title);
+
+    // --- Замер ширины цифр ---
+    const measure = document.createElementNS(svgNS, 'svg');
+    measure.style.position = 'absolute';
+    measure.style.visibility = 'hidden';
+    measure.setAttribute('width', '0');
+    measure.setAttribute('height', '0');
+    document.body.appendChild(measure);
+
+    function measureDigit(ch) {
+      const t = document.createElementNS(svgNS, 'text');
+      t.setAttribute('font-family', '"Bebas Neue", sans-serif');
+      t.setAttribute('font-weight', '700');
+      t.setAttribute('font-size', YEAR_FONT_SIZE);
+      t.textContent = ch;
+      measure.appendChild(t);
+      const w = t.getComputedTextLength();
+      measure.removeChild(t);
+      return w;
+    }
+
+    const digits = ['2','0','2','2'];
+    const possibleLast = ['2','3','4','5','6'];
+    const lastWidths = possibleLast.map(measureDigit);
+    const maxLastW = Math.max(...lastWidths);
+
+    const widths = [
+      measureDigit('2'),
+      measureDigit('0'),
+      measureDigit('2'),
+      maxLastW
+    ];
+    const totalW = widths.reduce((a,b) => a+b, 0) + DIGIT_GAP * (digits.length - 1);
+    const startX = VW/2 - totalW/2;
+    const yearY  = VH * (YEAR_Y_PERCENT / 100);
+
+    const centers = [];
+    let acc = startX;
+    for (let i = 0; i < digits.length; i++) {
+      centers.push(acc + widths[i]/2);
+      acc += widths[i] + DIGIT_GAP;
+    }
+
+    // Первые 3 цифры — вырез в маске
+    for (let i = 0; i < 3; i++) {
+      const d = document.createElementNS(svgNS, 'text');
+      d.setAttribute('x', centers[i]);
+      d.setAttribute('y', yearY);
+      d.setAttribute('text-anchor', 'middle');
+      d.setAttribute('font-family', '"Bebas Neue", sans-serif');
+      d.setAttribute('font-weight', '700');
+      d.setAttribute('font-size', YEAR_FONT_SIZE);
+      d.setAttribute('fill', 'black');
+      d.textContent = digits[i];
+      mask.appendChild(d);
+    }
+
+    // Последняя цифра с clipPath
+    const lastCx = centers[3];
+    const lastW  = widths[3];
+    const lastH  = YEAR_FONT_SIZE * 1.1;
+
+    const clip = document.createElementNS(svgNS, 'clipPath');
+    clip.setAttribute('id', 'lastDigitClip');
+    clip.setAttribute('clipPathUnits', 'userSpaceOnUse');
+    const clipRect = document.createElementNS(svgNS, 'rect');
+    clipRect.setAttribute('x', lastCx - lastW/2 - 10);
+    clipRect.setAttribute('y', yearY - lastH + 30);
+    clipRect.setAttribute('width', lastW + 20);
+    clipRect.setAttribute('height', lastH);
+    clip.appendChild(clipRect);
+    defs.appendChild(clip);
+
+    const lastGroup = document.createElementNS(svgNS, 'g');
+    lastGroup.setAttribute('id', 'lastDigitGroup');
+    lastGroup.setAttribute('clip-path', 'url(#lastDigitClip)');
+
+    const firstLast = document.createElementNS(svgNS, 'text');
+    firstLast.setAttribute('x', lastCx);
+    firstLast.setAttribute('y', yearY);
+    firstLast.setAttribute('text-anchor', 'middle');
+    firstLast.setAttribute('font-family', '"Bebas Neue", sans-serif');
+    firstLast.setAttribute('font-weight', '700');
+    firstLast.setAttribute('font-size', YEAR_FONT_SIZE);
+    firstLast.setAttribute('fill', 'black');
+    firstLast.setAttribute('id', 'currentLastDigit');
+    firstLast.textContent = digits[3];
+    lastGroup.appendChild(firstLast);
+
+    mask.appendChild(lastGroup);
+
+    defs.appendChild(mask);
+    svg.appendChild(defs);
+
+    // Фиолетовый прямоугольник с маской
+    const overlayRect = document.createElementNS(svgNS, 'rect');
+    overlayRect.setAttribute('x', 0);
+    overlayRect.setAttribute('y', 0);
+    overlayRect.setAttribute('width',  VW);
+    overlayRect.setAttribute('height', VH);
+    overlayRect.setAttribute('fill', '#4b2861');
+    overlayRect.setAttribute('mask', 'url(#textMask)');
+    svg.appendChild(overlayRect);
+
+    // --- Белая обводка с подсветкой ---
+    const strokeGroup = document.createElementNS(svgNS, 'g');
+    strokeGroup.setAttribute('filter', 'url(#textGlow)');
+
+    function makeStrokeText(x, y, size, content, letterSpacing) {
+      const t = document.createElementNS(svgNS, 'text');
+      t.setAttribute('x', x);
+      t.setAttribute('y', y);
+      t.setAttribute('text-anchor', 'middle');
+      t.setAttribute('font-family', '"Bebas Neue", sans-serif');
+      t.setAttribute('font-weight', '700');
+      t.setAttribute('font-size', size);
+      if (letterSpacing) t.setAttribute('letter-spacing', letterSpacing);
+      t.setAttribute('fill', 'none');
+      t.setAttribute('stroke', '#ffffff');
+      t.setAttribute('stroke-width', STROKE_WIDTH);
+      t.setAttribute('stroke-linejoin', 'round');
+      t.setAttribute('stroke-linecap', 'round');
+      t.setAttribute('paint-order', 'stroke');
+      t.textContent = content;
+      return t;
+    }
+
+    // Обводка заголовка
+    const titleStroke = makeStrokeText(
+      VW/2,
+      VH * (TITLE_Y_PERCENT / 100),
+      TITLE_FONT_SIZE,
+      'ТЕХНОСТРЕЛКА',
+      TITLE_LETTER_SPACING
+    );
+    strokeGroup.appendChild(titleStroke);
+
+    // Обводка первых трёх цифр года
+    for (let i = 0; i < 3; i++) {
+      const ds = makeStrokeText(centers[i], yearY, YEAR_FONT_SIZE, digits[i]);
+      strokeGroup.appendChild(ds);
+    }
+
+    // Обводка последней цифры — внутри clipPath
+    const lastStrokeGroup = document.createElementNS(svgNS, 'g');
+    lastStrokeGroup.setAttribute('id', 'lastDigitStrokeGroup');
+    lastStrokeGroup.setAttribute('clip-path', 'url(#lastDigitClip)');
+
+    const firstLastStroke = makeStrokeText(lastCx, yearY, YEAR_FONT_SIZE, digits[3]);
+    firstLastStroke.setAttribute('id', 'currentLastDigitStroke');
+    lastStrokeGroup.appendChild(firstLastStroke);
+
+    strokeGroup.appendChild(lastStrokeGroup);
+    svg.appendChild(strokeGroup);
+
+    document.body.appendChild(svg);
+    measure.remove();
+
+    window._yearParams = {
+      centerX:  lastCx,
+      y:        yearY,
+      fontSize: YEAR_FONT_SIZE,
+      group:    lastGroup,
+      strokeGroup: lastStrokeGroup,
+      height:   lastH
+    };
+  }
+
+  // --- Плавная прокрутка последней цифры (ускорена: 1700 -> 1100) ---
+  function slideDigit(newChar) {
+    return new Promise(resolve => {
+      const p = window._yearParams;
+      if (!p) { resolve(); return; }
+
+      const oldDigit = document.getElementById('currentLastDigit');
+      const oldStroke = document.getElementById('currentLastDigitStroke');
+      if (!oldDigit || !oldStroke) { resolve(); return; }
+
+      // Новая чёрная цифра (в маске)
+      const newDigit = document.createElementNS(svgNS, 'text');
+      newDigit.setAttribute('x', p.centerX);
+      newDigit.setAttribute('y', p.y + p.height);
+      newDigit.setAttribute('text-anchor', 'middle');
+      newDigit.setAttribute('font-family', '"Bebas Neue", sans-serif');
+      newDigit.setAttribute('font-weight', '700');
+      newDigit.setAttribute('font-size', p.fontSize);
+      newDigit.setAttribute('fill', 'black');
+      newDigit.textContent = newChar;
+      p.group.appendChild(newDigit);
+
+      // Новая обводка
+      const newStroke = document.createElementNS(svgNS, 'text');
+      newStroke.setAttribute('x', p.centerX);
+      newStroke.setAttribute('y', p.y + p.height);
+      newStroke.setAttribute('text-anchor', 'middle');
+      newStroke.setAttribute('font-family', '"Bebas Neue", sans-serif');
+      newStroke.setAttribute('font-weight', '700');
+      newStroke.setAttribute('font-size', p.fontSize);
+      newStroke.setAttribute('fill', 'none');
+      newStroke.setAttribute('stroke', '#ffffff');
+      newStroke.setAttribute('stroke-width', STROKE_WIDTH);
+      newStroke.setAttribute('stroke-linejoin', 'round');
+      newStroke.setAttribute('stroke-linecap', 'round');
+      newStroke.setAttribute('paint-order', 'stroke');
+      newStroke.textContent = newChar;
+      p.strokeGroup.appendChild(newStroke);
+
+      const duration = 1100; // ускорено
+      const startTime = performance.now();
+      const oldStartY = p.y;
+      const newStartY = p.y + p.height;
+      const oldEndY   = p.y - p.height;
+      const newEndY   = p.y;
+
+      function easeInOutCubic(t) {
+        return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+      }
+
+      function animate(now) {
+        const elapsed = now - startTime;
+        const t = Math.min(elapsed / duration, 1);
+        const e = easeInOutCubic(t);
+
+        const oldY = oldStartY + (oldEndY - oldStartY) * e;
+        const newY = newStartY + (newEndY - newStartY) * e;
+
+        oldDigit.setAttribute('y', oldY);
+        newDigit.setAttribute('y', newY);
+        oldStroke.setAttribute('y', oldY);
+        newStroke.setAttribute('y', newY);
+
+        if (t < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          oldDigit.remove();
+          oldStroke.remove();
+          newDigit.setAttribute('id', 'currentLastDigit');
+          newStroke.setAttribute('id', 'currentLastDigitStroke');
+          resolve();
+        }
+      }
+      requestAnimationFrame(animate);
+    });
+  }
+
+  function wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // =====================================================
+  //      КОНФЕТТИ
+  // =====================================================
+  const confettiCanvas = document.getElementById('confetti');
+  const cctx = confettiCanvas.getContext('2d');
+
+  function resizeConfetti() {
+    confettiCanvas.width  = window.innerWidth;
+    confettiCanvas.height = window.innerHeight;
+  }
+  resizeConfetti();
+  window.addEventListener('resize', resizeConfetti);
+
+  const CONFETTI_COLORS = [
+    '#ff3b6b', '#ffd93d', '#6bff6b',
+    '#3dd9ff', '#b23dff', '#ff8c42',
+    '#ffffff', '#ff6b9d'
+  ];
+
+  const particles = [];
+
+  function spawnParticle(fromLeft) {
+    const W = confettiCanvas.width;
+    const H = confettiCanvas.height;
+
+    const x = fromLeft ? -20 : W + 20;
+    const y = H * (0.25 + Math.random() * 0.55);
+
+    const baseVx = fromLeft ? (13 + Math.random() * 9) : -(13 + Math.random() * 9);
+    const vx = baseVx + (Math.random() - 0.5) * 3;
+    const vy = -(7 + Math.random() * 9);
+
+    particles.push({
+      x, y, vx, vy,
+      size: 7 + Math.random() * 7,
+      color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+      rot: Math.random() * Math.PI * 2,
+      vr: (Math.random() - 0.5) * 0.25,
+      shape: Math.random() < 0.5 ? 'rect' : 'circle',
+      life: 0,
+      maxLife: 280 + Math.random() * 100,
+      glow: 12 + Math.random() * 10
+    });
+  }
+
+  let confettiRunning = false;
+
+  function launchConfetti() {
+    confettiRunning = true;
+    confettiFinished = false;
+
+    const emitDuration = 3500;
+    const emitStart = performance.now();
+
+    function emit() {
+      const elapsed = performance.now() - emitStart;
+      if (elapsed < emitDuration) {
+        spawnParticle(true);
+        spawnParticle(false);
+        if (Math.random() < 0.4) {
+          spawnParticle(Math.random() < 0.5);
+        }
+        setTimeout(emit, 90);
+      } else {
+        confettiRunning = false;
+      }
+    }
+    emit();
+
+    requestAnimationFrame(renderConfetti);
+  }
+
+  function renderConfetti() {
+    const W = confettiCanvas.width;
+    const H = confettiCanvas.height;
+
+    cctx.clearRect(0, 0, W, H);
+
+    const gravity = 0.32;
+    const drag = 0.993;
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+
+      p.vy += gravity;
+      p.vx *= drag;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rot += p.vr;
+      p.life++;
+
+      const lifeRatio = p.life / p.maxLife;
+      const alpha = lifeRatio < 0.8 ? 1 : Math.max(0, 1 - (lifeRatio - 0.8) / 0.2);
+
+      cctx.save();
+      cctx.translate(p.x, p.y);
+      cctx.rotate(p.rot);
+      cctx.globalAlpha = alpha;
+      cctx.shadowColor = p.color;
+      cctx.shadowBlur  = p.glow;
+      cctx.fillStyle   = p.color;
+
+      if (p.shape === 'rect') {
+        cctx.fillRect(-p.size/2, -p.size/2, p.size, p.size * 0.6);
+      } else {
+        cctx.beginPath();
+        cctx.arc(0, 0, p.size/2, 0, Math.PI * 2);
+        cctx.fill();
+      }
+      cctx.restore();
+
+      if (p.y > H + 40 || p.life > p.maxLife || p.x < -200 || p.x > W + 200) {
+        particles.splice(i, 1);
+      }
+    }
+
+    cctx.globalAlpha = 1;
+
+    if (confettiRunning || particles.length > 0) {
+      requestAnimationFrame(renderConfetti);
+    } else {
+      cctx.clearRect(0, 0, W, H);
+      // Конфетти закончилось — разрешаем финальное затемнение по пробелу
+      confettiFinished = true;
+      phase = 'done';
+    }
+  }
+</script>
+
+</body>
+</html>
