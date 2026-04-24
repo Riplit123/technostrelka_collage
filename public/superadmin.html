@@ -199,6 +199,76 @@
   .switch input:checked + .slider { background: var(--green); }
   .switch input:checked + .slider::before { transform: translateX(30px); }
 
+  /* Блок загрузки суперадмина */
+  .upload-row {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 14px 16px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+  .upload-row .info .t {
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .upload-row .info .s {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .btn-upload {
+    background: linear-gradient(135deg, #7a3fa0, #a855f7);
+    border: none;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: transform 0.08s ease, box-shadow 0.2s ease;
+    white-space: nowrap;
+  }
+  .btn-upload:hover  { box-shadow: 0 8px 24px rgba(168,85,247,0.4); }
+  .btn-upload:active { transform: scale(0.98); }
+  .file-input {
+    display: none;
+  }
+  .file-label {
+    display: inline-block;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid var(--border);
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s;
+  }
+  .file-label:hover { background: rgba(255,255,255,0.14); }
+  .upload-preview {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.06);
+    background-size: cover;
+    background-position: center;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    display: none;
+  }
+  .upload-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
   /* Кнопка «снести всё» */
   .danger-row {
     margin-top: 14px;
@@ -226,6 +296,7 @@
   }
   .btn-danger:hover  { box-shadow: 0 8px 24px rgba(239,68,68,0.4); }
   .btn-danger:active { transform: scale(0.98); }
+  .btn-danger:disabled { opacity: 0.5; pointer-events: none; }
 
   /* Toast */
   .toast {
@@ -325,7 +396,8 @@
     .card { padding: 16px; }
     .card .value { font-size: 24px; }
     section.panel { padding: 18px; }
-    .switch-row, .danger-row { flex-direction: column; align-items: stretch; gap: 12px; }
+    .switch-row, .danger-row, .upload-row { flex-direction: column; align-items: stretch; gap: 12px; }
+    .upload-controls { flex-wrap: wrap; }
   }
 </style>
 </head>
@@ -396,6 +468,20 @@
       </label>
     </div>
 
+    <!-- ====== НОВОЕ: загрузка суперадмина ====== -->
+    <div class="upload-row">
+      <div class="info">
+        <div class="t">📤 Загрузить своё фото в коллаж</div>
+        <div class="s">Файл сразу попадёт в одобренные без модерации</div>
+      </div>
+      <div class="upload-controls">
+        <div class="upload-preview" id="uploadPreview"></div>
+        <input type="file" accept="image/*" class="file-input" id="fileInput">
+        <label for="fileInput" class="file-label" id="fileLabel">Выбрать файл</label>
+        <button class="btn-upload" id="btnUpload" disabled>Загрузить</button>
+      </div>
+    </div>
+
     <div class="danger-row">
       <div class="info">
         <div class="t" style="color:#fca5a5">🗑 Удалить все фото</div>
@@ -429,7 +515,6 @@
   // =====================================================
   //   СЕКРЕТ ИЗ URL
   // =====================================================
-  // URL: /superadmin/root-9xQ2k
   const m = location.pathname.match(/^\/superadmin\/([^\/]+)/);
   const SECRET = m ? decodeURIComponent(m[1]) : null;
 
@@ -472,6 +557,12 @@
   const wipeYes       = $('wipeYes');
 
   const toastEl       = $('toast');
+
+  // Новые элементы для загрузки
+  const fileInput     = $('fileInput');
+  const fileLabel     = $('fileLabel');
+  const btnUpload     = $('btnUpload');
+  const uploadPreview = $('uploadPreview');
 
   // =====================================================
   //   ВСПОМОГАТЕЛЬНЫЕ
@@ -543,7 +634,6 @@
 
     storageMB.textContent = s.storage.mb;
 
-    // Свич
     uploadsSwitch.checked = !!s.uploadsEnabled;
     uploadStateTx.textContent = s.uploadsEnabled
       ? 'Включено — участники могут загружать фото'
@@ -580,6 +670,78 @@
       toast('Сеть недоступна', 'err');
     } finally {
       uploadsSwitch.disabled = false;
+    }
+  });
+
+  // =====================================================
+  //   ЗАГРУЗКА ФОТО СУПЕРАДМИНОМ
+  // =====================================================
+  let selectedFile = null;
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files[0];
+    if (!file) {
+      selectedFile = null;
+      btnUpload.disabled = true;
+      uploadPreview.style.display = 'none';
+      fileLabel.textContent = 'Выбрать файл';
+      return;
+    }
+
+    // Проверка типа (image)
+    if (!file.type.startsWith('image/')) {
+      toast('Выберите изображение', 'err');
+      fileInput.value = '';
+      selectedFile = null;
+      btnUpload.disabled = true;
+      uploadPreview.style.display = 'none';
+      return;
+    }
+
+    selectedFile = file;
+    btnUpload.disabled = false;
+    fileLabel.textContent = file.name.length > 18
+      ? file.name.substring(0,15) + '…'
+      : file.name;
+    // Превью
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      uploadPreview.style.backgroundImage = `url(${e.target.result})`;
+      uploadPreview.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  });
+
+  btnUpload.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    btnUpload.disabled = true;
+    const formData = new FormData();
+    formData.append('photo', selectedFile);
+
+    try {
+      const url = '/api/super/upload?secret=' + encodeURIComponent(SECRET);
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'X-Superadmin': SECRET },
+        body: formData
+      });
+      const data = await r.json();
+      if (data.ok) {
+        toast('✓ Фото загружено и добавлено в коллаж', 'ok');
+        // Сброс формы
+        fileInput.value = '';
+        selectedFile = null;
+        btnUpload.disabled = true;
+        uploadPreview.style.display = 'none';
+        fileLabel.textContent = 'Выбрать файл';
+        loadStats(); // обновим счётчики
+      } else {
+        toast('Ошибка: ' + (data.error || 'неизвестно'), 'err');
+        btnUpload.disabled = false;
+      }
+    } catch (e) {
+      toast('Сеть недоступна', 'err');
+      btnUpload.disabled = false;
     }
   });
 
@@ -642,7 +804,7 @@
       reconnectTimer = setTimeout(connectWS, 1500);
     });
 
-        ws.addEventListener('error', () => {
+    ws.addEventListener('error', () => {
       try { ws.close(); } catch(_) {}
     });
 
@@ -651,7 +813,6 @@
       try { msg = JSON.parse(ev.data); } catch(_) { return; }
 
       switch (msg.type) {
-        // Любое изменение статистики — перезапросим цифры
         case 'stats_changed':
         case 'clients_changed':
         case 'new_pending':
@@ -661,7 +822,6 @@
           loadStats();
           break;
 
-        // Изменился свич — обновим UI без запроса
         case 'uploads_state':
           uploadsSwitch.checked = !!msg.enabled;
           uploadStateTx.textContent = msg.enabled
@@ -681,10 +841,8 @@
   loadStats();
   connectWS();
 
-  // Периодически обновляем uptime/память (на случай, если событий нет)
   setInterval(loadStats, 5000);
 
-  // Esc закрывает модалку
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') wipeModal.classList.remove('show');
   });
