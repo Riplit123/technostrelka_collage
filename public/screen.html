@@ -11,7 +11,8 @@
          url('fonts/BebasNeue-Regular.woff') format('woff'),
          url('fonts/BebasNeue-Regular.ttf') format('truetype');
     font-weight: 400 700;
-    font-style: normal;    font-display: block;
+    font-style: normal;
+    font-display: block;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -717,13 +718,13 @@
     defs.appendChild(mask);
     svg.appendChild(defs);
 
-    // Фиолетовый прямоугольник с маской
+    // Фиолетовый прямоугольник с маской – ТЕПЕРЬ ПОЛУПРОЗРАЧНЫЙ (0.75 opacity)
     const overlayRect = document.createElementNS(svgNS, 'rect');
     overlayRect.setAttribute('x', 0);
     overlayRect.setAttribute('y', 0);
     overlayRect.setAttribute('width',  VW);
     overlayRect.setAttribute('height', VH);
-    overlayRect.setAttribute('fill', '#4b2861');
+    overlayRect.setAttribute('fill', 'rgba(75,40,97,0.75)'); // было '#4b2861'
     overlayRect.setAttribute('mask', 'url(#textMask)');
     svg.appendChild(overlayRect);
 
