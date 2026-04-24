@@ -28,7 +28,6 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
 
-  /* ---- Шапка ---- */
   header {
     position: sticky;
     top: 0;
@@ -86,7 +85,6 @@
     gap: 24px;
   }
 
-  /* ---- Сетка карточек ---- */
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -118,7 +116,6 @@
   }
   .card.accent .value { color: var(--purple2); }
 
-  /* Прогресс-бар по фото */
   .progress {
     width: 100%;
     height: 8px;
@@ -137,7 +134,6 @@
   .progress .fill.warn   { background: linear-gradient(90deg, #ca8a04, var(--yellow)); }
   .progress .fill.danger { background: linear-gradient(90deg, #b91c1c, var(--red)); }
 
-  /* ---- Секция управления ---- */
   section.panel {
     background: linear-gradient(135deg, var(--card), var(--card2));
     border: 1px solid var(--border);
@@ -151,7 +147,6 @@
     letter-spacing: 0.5px;
   }
 
-  /* Переключатель */
   .switch-row {
     display: flex;
     align-items: center;
@@ -203,9 +198,8 @@
   .upload-row {
     margin-top: 14px;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 20px;
+    flex-direction: column;
+    gap: 14px;
     padding: 14px 16px;
     background: rgba(0,0,0,0.2);
     border-radius: 12px;
@@ -220,21 +214,12 @@
     color: var(--muted);
     margin-top: 2px;
   }
-  .btn-upload {
-    background: linear-gradient(135deg, #7a3fa0, #a855f7);
-    border: none;
-    color: #fff;
-    padding: 10px 20px;
-    border-radius: 10px;
-    font-size: 14px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    cursor: pointer;
-    transition: transform 0.08s ease, box-shadow 0.2s ease;
-    white-space: nowrap;
+  .upload-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
   }
-  .btn-upload:hover  { box-shadow: 0 8px 24px rgba(168,85,247,0.4); }
-  .btn-upload:active { transform: scale(0.98); }
   .file-input {
     display: none;
   }
@@ -252,24 +237,58 @@
     transition: background 0.2s;
   }
   .file-label:hover { background: rgba(255,255,255,0.14); }
-  .upload-preview {
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
-    background: rgba(255,255,255,0.06);
-    background-size: cover;
-    background-position: center;
-    flex-shrink: 0;
-    border: 1px solid var(--border);
-    display: none;
+  .btn-upload {
+    background: linear-gradient(135deg, #7a3fa0, #a855f7);
+    border: none;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: transform 0.08s ease, box-shadow 0.2s ease;
+    white-space: nowrap;
   }
-  .upload-controls {
+  .btn-upload:hover  { box-shadow: 0 8px 24px rgba(168,85,247,0.4); }
+  .btn-upload:active { transform: scale(0.98); }
+  .btn-upload:disabled { opacity: 0.5; pointer-events: none; }
+
+  .file-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    max-height: 120px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .file-chip {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 13px;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 6px;
+    white-space: nowrap;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
+  .file-chip .name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .upload-progress {
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .upload-progress .ok { color: var(--green); }
+  .upload-progress .err { color: var(--red); }
 
-  /* Кнопка «снести всё» */
+  /* Остальное */
   .danger-row {
     margin-top: 14px;
     display: flex;
@@ -298,7 +317,6 @@
   .btn-danger:active { transform: scale(0.98); }
   .btn-danger:disabled { opacity: 0.5; pointer-events: none; }
 
-  /* Toast */
   .toast {
     position: fixed;
     bottom: 24px;
@@ -324,7 +342,6 @@
   .toast.ok  { border-color: rgba(34,197,94,0.4); }
   .toast.err { border-color: rgba(239,68,68,0.5); }
 
-  /* Модалка подтверждения */
   .modal-backdrop {
     position: fixed; inset: 0;
     background: rgba(0,0,0,0.7);
@@ -387,7 +404,6 @@
   }
   .btn-secondary:hover { background: rgba(255,255,255,0.14); }
 
-  /* Адаптив */
   @media (max-width: 640px) {
     header { height: 56px; padding: 0 14px; }
     .brand .title { font-size: 11px; letter-spacing: 2px; }
@@ -415,9 +431,7 @@
 </header>
 
 <main>
-  <!-- ---- Статистика ---- -->
   <div class="grid">
-
     <div class="card accent">
       <div class="label">Фото на сервере</div>
       <div class="value"><span id="photoTotal">0</span> <span style="opacity:.4">/ <span id="photoLimit">200</span></span></div>
@@ -450,10 +464,8 @@
       <div class="value"><span id="storageMB">0</span> <span style="opacity:.4">МБ</span></div>
       <div class="sub">Папка с исходниками фото</div>
     </div>
-
   </div>
 
-  <!-- ---- Панель управления ---- -->
   <section class="panel">
     <h2>⚙️ Управление</h2>
 
@@ -468,18 +480,24 @@
       </label>
     </div>
 
-    <!-- ====== НОВОЕ: загрузка суперадмина ====== -->
+    <!-- ====== МНОЖЕСТВЕННАЯ ЗАГРУЗКА ====== -->
     <div class="upload-row">
       <div class="info">
-        <div class="t">📤 Загрузить своё фото в коллаж</div>
-        <div class="s">Файл сразу попадёт в одобренные без модерации</div>
+        <div class="t">📤 Загрузить свои фото в коллаж</div>
+        <div class="s">Выберите один или несколько файлов — они попадут в коллаж без модерации</div>
       </div>
+
       <div class="upload-controls">
-        <div class="upload-preview" id="uploadPreview"></div>
-        <input type="file" accept="image/*" class="file-input" id="fileInput">
-        <label for="fileInput" class="file-label" id="fileLabel">Выбрать файл</label>
-        <button class="btn-upload" id="btnUpload" disabled>Загрузить</button>
+        <input type="file" accept="image/*" class="file-input" id="fileInput" multiple>
+        <label for="fileInput" class="file-label" id="fileLabel">Выбрать файлы</label>
+        <button class="btn-upload" id="btnUpload" disabled>Загрузить всё</button>
       </div>
+
+      <!-- Превью списка файлов -->
+      <div class="file-list" id="fileList"></div>
+
+      <!-- Прогресс загрузки -->
+      <div class="upload-progress" id="uploadProgress"></div>
     </div>
 
     <div class="danger-row">
@@ -494,7 +512,6 @@
 
 <div class="toast" id="toast">ok</div>
 
-<!-- Модалка подтверждения wipe -->
 <div class="modal-backdrop" id="wipeModal">
   <div class="modal">
     <h3>⚠️ Точно удалить все фото?</h3>
@@ -512,19 +529,13 @@
 </div>
 
 <script>
-  // =====================================================
-  //   СЕКРЕТ ИЗ URL
-  // =====================================================
   const m = location.pathname.match(/^\/superadmin\/([^\/]+)/);
   const SECRET = m ? decodeURIComponent(m[1]) : null;
-
   if (!SECRET) {
-    document.body.innerHTML =
-      '<div style="padding:40px;font-family:sans-serif;color:#fff;">Неверная ссылка.</div>';
+    document.body.innerHTML = '<div style="padding:40px;font-family:sans-serif;color:#fff;">Неверная ссылка.</div>';
     throw new Error('no secret');
   }
 
-  // ---- DOM ----
   const $ = (id) => document.getElementById(id);
 
   const photoTotal    = $('photoTotal');
@@ -558,15 +569,15 @@
 
   const toastEl       = $('toast');
 
-  // Новые элементы для загрузки
   const fileInput     = $('fileInput');
   const fileLabel     = $('fileLabel');
   const btnUpload     = $('btnUpload');
-  const uploadPreview = $('uploadPreview');
+  const fileList      = $('fileList');
+  const uploadProgress = $('uploadProgress');
 
-  // =====================================================
-  //   ВСПОМОГАТЕЛЬНЫЕ
-  // =====================================================
+  // Список выбранных файлов (не отправленных)
+  let selectedFiles = [];
+
   function toast(text, kind) {
     toastEl.textContent = text;
     toastEl.className = 'toast show' + (kind ? ' ' + kind : '');
@@ -602,14 +613,10 @@
     return r.json();
   }
 
-  // =====================================================
-  //   ОТРИСОВКА СТАТИСТИКИ
-  // =====================================================
   let lastStats = null;
 
   function renderStats(s) {
     lastStats = s;
-
     photoTotal.textContent    = s.photo.total;
     photoLimit.textContent    = s.photo.limit;
     photoApproved.textContent = s.photo.approved;
@@ -631,7 +638,6 @@
     uptimeEl    .textContent = fmtDuration(s.uptimeMs);
     procUptimeEl.textContent = fmtDuration(s.processUptimeS * 1000);
     memUsageEl  .textContent = s.memoryMB;
-
     storageMB.textContent = s.storage.mb;
 
     uploadsSwitch.checked = !!s.uploadsEnabled;
@@ -650,9 +656,7 @@
     }
   }
 
-  // =====================================================
-  //   СВИЧ «ПРИЁМ ФОТО»
-  // =====================================================
+  // Свич приёма
   uploadsSwitch.addEventListener('change', async () => {
     const want = uploadsSwitch.checked;
     uploadsSwitch.disabled = true;
@@ -673,81 +677,87 @@
     }
   });
 
-  // =====================================================
-  //   ЗАГРУЗКА ФОТО СУПЕРАДМИНОМ
-  // =====================================================
-  let selectedFile = null;
-
+  // ========== МНОЖЕСТВЕННАЯ ЗАГРУЗКА ==========
   fileInput.addEventListener('change', () => {
-    const file = fileInput.files[0];
-    if (!file) {
-      selectedFile = null;
-      btnUpload.disabled = true;
-      uploadPreview.style.display = 'none';
-      fileLabel.textContent = 'Выбрать файл';
-      return;
-    }
-
-    // Проверка типа (image)
-    if (!file.type.startsWith('image/')) {
-      toast('Выберите изображение', 'err');
-      fileInput.value = '';
-      selectedFile = null;
-      btnUpload.disabled = true;
-      uploadPreview.style.display = 'none';
-      return;
-    }
-
-    selectedFile = file;
-    btnUpload.disabled = false;
-    fileLabel.textContent = file.name.length > 18
-      ? file.name.substring(0,15) + '…'
-      : file.name;
-    // Превью
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      uploadPreview.style.backgroundImage = `url(${e.target.result})`;
-      uploadPreview.style.display = 'block';
-    };
-    reader.readAsDataURL(file);
+    selectedFiles = Array.from(fileInput.files);
+    renderFileList();
   });
+
+  function renderFileList() {
+    fileList.innerHTML = '';
+    if (selectedFiles.length === 0) {
+      fileLabel.textContent = 'Выбрать файлы';
+      btnUpload.disabled = true;
+      return;
+    }
+    fileLabel.textContent = `Выбрано: ${selectedFiles.length}`;
+    btnUpload.disabled = false;
+
+    selectedFiles.forEach((file, index) => {
+      const chip = document.createElement('div');
+      chip.className = 'file-chip';
+      chip.innerHTML = `<span class="name">${escapeHtml(file.name)}</span>`;
+      fileList.appendChild(chip);
+    });
+  }
+
+  function escapeHtml(text) {
+    const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+    return text.replace(/[&<>"']/g, m => map[m]);
+  }
 
   btnUpload.addEventListener('click', async () => {
-    if (!selectedFile) return;
+    if (selectedFiles.length === 0) return;
     btnUpload.disabled = true;
-    const formData = new FormData();
-    formData.append('photo', selectedFile);
+    uploadProgress.innerHTML = 'Загрузка...';
+    let successCount = 0;
+    let failCount = 0;
 
-    try {
-      const url = '/api/super/upload?secret=' + encodeURIComponent(SECRET);
-      const r = await fetch(url, {
-        method: 'POST',
-        headers: { 'X-Superadmin': SECRET },
-        body: formData
-      });
-      const data = await r.json();
-      if (data.ok) {
-        toast('✓ Фото загружено и добавлено в коллаж', 'ok');
-        // Сброс формы
-        fileInput.value = '';
-        selectedFile = null;
-        btnUpload.disabled = true;
-        uploadPreview.style.display = 'none';
-        fileLabel.textContent = 'Выбрать файл';
-        loadStats(); // обновим счётчики
-      } else {
-        toast('Ошибка: ' + (data.error || 'неизвестно'), 'err');
-        btnUpload.disabled = false;
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const file = selectedFiles[i];
+      try {
+        const formData = new FormData();
+        formData.append('photo', file);
+        const url = '/api/super/upload?secret=' + encodeURIComponent(SECRET);
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: { 'X-Superadmin': SECRET },
+          body: formData
+        });
+        const data = await r.json();
+        if (data.ok) {
+          successCount++;
+        } else {
+          failCount++;
+          console.warn('Upload failed:', data.error);
+        }
+      } catch (e) {
+        failCount++;
+        console.error(e);
       }
-    } catch (e) {
-      toast('Сеть недоступна', 'err');
-      btnUpload.disabled = false;
+      // обновляем прогресс
+      uploadProgress.innerHTML = `Загружено: ${i+1}/${selectedFiles.length} (успешно: <span class="ok">${successCount}</span>, ошибок: <span class="err">${failCount}</span>)`;
     }
+
+    // Завершение
+    if (failCount === 0) {
+      toast(`✓ Все ${successCount} фото загружены в коллаж`, 'ok');
+    } else if (successCount > 0) {
+      toast(`⚠ Загружено ${successCount} из ${selectedFiles.length}. Ошибок: ${failCount}`, 'err');
+    } else {
+      toast(`✗ Ни одно фото не загружено`, 'err');
+    }
+
+    // Сброс формы
+    fileInput.value = '';
+    selectedFiles = [];
+    renderFileList();
+    btnUpload.disabled = true;
+    uploadProgress.innerHTML = '';
+    loadStats(); // обновим счётчики
   });
 
-  // =====================================================
-  //   КНОПКА «СТЕРЕТЬ ВСЁ» С ДВОЙНЫМ ПОДТВЕРЖДЕНИЕМ
-  // =====================================================
+  // ========== WIPE ==========
   btnWipe.addEventListener('click', () => {
     wipeConfirm.value = '';
     wipeYes.disabled = true;
@@ -781,9 +791,7 @@
     }
   });
 
-  // =====================================================
-  //   WEBSOCKET
-  // =====================================================
+  // ========== WEBSOCKET ==========
   let ws = null;
   let reconnectTimer = null;
 
@@ -811,7 +819,6 @@
     ws.addEventListener('message', (ev) => {
       let msg;
       try { msg = JSON.parse(ev.data); } catch(_) { return; }
-
       switch (msg.type) {
         case 'stats_changed':
         case 'clients_changed':
@@ -821,26 +828,19 @@
         case 'wipe':
           loadStats();
           break;
-
         case 'uploads_state':
           uploadsSwitch.checked = !!msg.enabled;
           uploadStateTx.textContent = msg.enabled
             ? 'Включено — участники могут загружать фото'
             : 'Выключено — кнопка загрузки заблокирована у всех';
-          if (lastStats) {
-            lastStats.uploadsEnabled = !!msg.enabled;
-          }
+          if (lastStats) lastStats.uploadsEnabled = !!msg.enabled;
           break;
       }
     });
   }
 
-  // =====================================================
-  //   СТАРТ
-  // =====================================================
   loadStats();
   connectWS();
-
   setInterval(loadStats, 5000);
 
   document.addEventListener('keydown', (e) => {
