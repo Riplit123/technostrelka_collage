@@ -444,6 +444,44 @@ app.post('/api/super/uploads-toggle', (req, res) => {
   res.json({ ok: true, enabled: desired });
 });
 
+// ========== НОВОЕ: загрузка фото суперадмином (сразу в одобренные) ==========
+app.post('/api/super/upload', upload.single('photo'), async (req, res) => {
+  if (!checkSuperSecret(req)) return res.status(403).json({ ok: false });
+
+  try {
+    if (!req.file) return res.status(400).json({ ok: false, error: 'no_file' });
+
+    // Лимит фото (как при модерации)
+    if (approved.length >= MAX_APPROVED_PHOTOS) {
+      return res.status(507).json({ ok: false, error: 'limit_reached' });
+    }
+
+    const id = genId();
+    const filename = `${id}.jpg`;
+    const fullPath = path.join(UPLOAD_DIR, filename);
+
+    await sharp(req.file.buffer, { failOn: 'none' })
+      .rotate()
+      .resize({ width: PHOTO_MAX_WIDTH, withoutEnlargement: true })
+      .jpeg({ quality: PHOTO_QUALITY, mozjpeg: true })
+      .toFile(fullPath);
+
+    const url = `/uploads/${filename}`;
+    const approvedItem = { id, url, approvedAt: Date.now() };
+    approved.push(approvedItem);
+    saveApproved();
+
+    broadcastToScreens({ type: 'approved', url });
+    broadcastToSupers({ type: 'stats_changed' });
+
+    console.log(`[super] uploaded photo ${id} directly to collage`);
+    res.json({ ok: true, id });
+  } catch (err) {
+    console.error('super upload error:', err.message);
+    res.status(400).json({ ok: false, error: 'upload_failed' });
+  }
+});
+
 // Стереть все фото
 app.post('/api/super/wipe', (req, res) => {
   if (!checkSuperSecret(req)) return res.status(403).json({ ok: false });
@@ -606,7 +644,6 @@ function getLanIPs() {
   const nets = os.networkInterfaces();
   for (const name of Object.keys(nets)) {
     for (const net of nets[name] || []) {
-      // IPv4, не loopback, не virtual
       if (net.family === 'IPv4' && !net.internal) {
         ips.push(net.address);
       }
