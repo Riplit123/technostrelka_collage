@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Технострелка — модерация</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <style>
   :root {
     --bg:     #0f0a14;
@@ -63,6 +64,21 @@
   }
   .dot.on  { background: #22c55e; box-shadow: 0 0 10px #22c55e; }
   .dot.off { background: #ef4444; box-shadow: 0 0 10px #ef4444; }
+
+  .qr-btn {
+    background: linear-gradient(135deg, var(--purple), var(--purple2));
+    border: none;
+    color: #fff;
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.1s ease, box-shadow 0.2s ease;
+    padding: 0;
+  }
+  .qr-btn:hover  { box-shadow: 0 4px 14px rgba(122,63,160,0.5); }
+  .qr-btn:active { transform: scale(0.95); }
+  .qr-btn svg { width: 22px; height: 22px; display: block; }
 
   main {
     position: absolute;
@@ -170,6 +186,29 @@
   }
   .toast.show { opacity: 1; transform: translateX(0); }
 
+  /* QR overlay */
+  .qr-overlay {
+    position: fixed; inset: 0;
+    background: #fff;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    cursor: pointer;
+    animation: qrFadeIn 0.2s ease;
+  }
+  .qr-overlay.visible { display: flex; }
+  @keyframes qrFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  .qr-overlay canvas,
+  .qr-overlay img {
+    width: min(90vw, 90vh);
+    height: min(90vw, 90vh);
+    display: block;
+  }
+
   @media (max-width: 640px) {
     header { height: 56px; padding: 0 14px; }
     .brand .title { font-size: 12px; letter-spacing: 2px; }
@@ -184,6 +223,8 @@
     .key-hint { display: none; }
     .hdr-right { gap: 10px; }
     .queue-badge { font-size: 12px; padding: 6px 10px; }
+    .qr-btn { width: 34px; height: 34px; }
+    .qr-btn svg { width: 18px; height: 18px; }
   }
 </style>
 </head>
@@ -200,6 +241,11 @@
       <span class="dot off" id="connDot"></span>
       <span id="connText">оффлайн</span>
     </div>
+    <button class="qr-btn" id="qrBtn" title="Показать QR-код" aria-label="Показать QR-код">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 3h7v7H3V3zm2 2v3h3V5H5zm9-2h7v7h-7V3zm2 2v3h3V5h-3zM3 14h7v7H3v-7zm2 2v3h3v-3H5zm9-2h3v3h-3v-3zm0 5h3v2h-3v-2zm5-5h2v3h-2v-3zm0 5h2v2h-2v-2z" fill="currentColor"/>
+      </svg>
+    </button>
   </div>
 </header>
 
@@ -228,12 +274,14 @@
 
 <div class="toast" id="toast">📸 Новое фото в очереди</div>
 
+<div class="qr-overlay" id="qrOverlay">
+  <canvas id="qrCanvas"></canvas>
+</div>
+
 <script>
   // =====================================================
   //   ПАРСИНГ ТОКЕНА ИЗ URL
   // =====================================================
-  // URL: /admin/1-a7k2p  →  stand=1, token="1-a7k2p"
-  // URL: /admin/3-a7k2p  →  stand=3, token="3-a7k2p"
   const pathMatch = location.pathname.match(/^\/admin\/(\d+)-([a-zA-Z0-9]{3,10})$/);
   const STAND = pathMatch ? parseInt(pathMatch[1], 10) : null;
   const TOKEN = pathMatch ? pathMatch[0].replace('/admin/', '') : null;
@@ -248,6 +296,9 @@
   const connDot      = document.getElementById('connDot');
   const connText     = document.getElementById('connText');
   const toast        = document.getElementById('toast');
+  const qrBtn        = document.getElementById('qrBtn');
+  const qrOverlay    = document.getElementById('qrOverlay');
+  const qrCanvas     = document.getElementById('qrCanvas');
 
   document.getElementById('standLabel').textContent = STAND ? ('Стенд №' + STAND) : '—';
 
@@ -271,9 +322,68 @@
   }
 
   // =====================================================
+  //   QR-КОД
+  // =====================================================
+  let qrGenerated = false;
+  let qrEl = qrCanvas;
+
+  function generateQR() {
+    if (qrGenerated || !STAND) return;
+    const uploadUrl = `${location.protocol}//${location.host}/upload/${STAND}`;
+    const size = Math.min(window.innerWidth, window.innerHeight) * 0.9;
+
+    if (window.QRCode && typeof window.QRCode.toCanvas === 'function') {
+      window.QRCode.toCanvas(qrEl, uploadUrl, {
+        width: Math.round(size),
+        margin: 2,
+        errorCorrectionLevel: 'H',
+        color: { dark: '#000000', light: '#ffffff' }
+      }, (err) => {
+        if (err) console.error('QR error', err);
+      });
+      qrGenerated = true;
+    } else {
+      // fallback: внешний сервис
+      const img = document.createElement('img');
+      img.src = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(uploadUrl)}`;
+      img.alt = '';
+      qrEl.replaceWith(img);
+      qrEl = img;
+      qrGenerated = true;
+    }
+  }
+
+  function openQR() {
+    generateQR();
+    qrOverlay.classList.add('visible');
+  }
+  function closeQR() {
+    qrOverlay.classList.remove('visible');
+  }
+
+  qrBtn.addEventListener('click', openQR);
+  qrOverlay.addEventListener('click', closeQR);
+
+  // регенерация при ресайзе если открыт
+  window.addEventListener('resize', () => {
+    if (qrOverlay.classList.contains('visible')) {
+      qrGenerated = false;
+      generateQR();
+    }
+  });
+
+  // Esc тоже закрывает
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Escape' && qrOverlay.classList.contains('visible')) {
+      e.preventDefault();
+      closeQR();
+    }
+  });
+
+  // =====================================================
   //   СОСТОЯНИЕ И РЕНДЕР
   // =====================================================
-  const queue = []; // { id, url, createdAt, uploaderId }
+  const queue = [];
   let processing = false;
 
   function render() {
@@ -299,20 +409,11 @@
     btnApprove.disabled = false;
   }
 
-  // =====================================================
-  //   ФИЛЬТРАЦИЯ ПО СТЕНДУ
-  // =====================================================
-  // Фото привязано к стенду через поле uploaderId
-  // (оно приходит со страницы /upload/:id → сервер сохраняет его).
-  // Если uploaderId не задан — показываем всем модераторам.
   function belongsToStand(item) {
-    if (!item.uploaderId) return true; // «общее» фото без привязки
+    if (!item.uploaderId) return true;
     return String(item.uploaderId) === String(STAND);
   }
 
-  // =====================================================
-  //   ЗАГРУЗКА НАЧАЛЬНОЙ ОЧЕРЕДИ
-  // =====================================================
   async function loadInitialQueue() {
     try {
       const r = await fetch('/api/pending/' + encodeURIComponent(TOKEN));
@@ -333,11 +434,9 @@
     }
   }
 
-  // =====================================================
-  //   ДЕЙСТВИЯ (approve / reject)
-  // =====================================================
   async function moderate(action) {
     if (processing || queue.length === 0) return;
+    if (qrOverlay.classList.contains('visible')) return;
     const current = queue[0];
     processing = true;
     btnReject.disabled = true;
@@ -375,11 +474,9 @@
   btnApprove.addEventListener('click', approve);
   btnReject .addEventListener('click', reject);
 
-  // =====================================================
-  //   ГОРЯЧИЕ КЛАВИШИ
-  // =====================================================
   document.addEventListener('keydown', (e) => {
     if (e.repeat) return;
+    if (qrOverlay.classList.contains('visible')) return;
     if (e.code === 'ArrowRight' || e.code === 'Enter') {
       e.preventDefault(); approve();
     }
@@ -419,17 +516,15 @@
       let msg;
       try { msg = JSON.parse(ev.data); } catch(_) { return; }
 
-      // Новое фото на модерации
       if (msg.type === 'new_pending' && msg.item) {
-        if (!belongsToStand(msg.item)) return;           // не наш стенд
-        if (queue.find(q => q.id === msg.item.id)) return; // уже есть
+        if (!belongsToStand(msg.item)) return;
+        if (queue.find(q => q.id === msg.item.id)) return;
         queue.push(msg.item);
         showToast('📸 Новое фото в очереди');
         render();
         return;
       }
 
-      // Кто-то обработал (в т.ч. другой модератор того же стенда)
       if (msg.type === 'moderated' && msg.id) {
         removeFromQueue(msg.id);
         render();
