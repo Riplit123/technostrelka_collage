@@ -219,11 +219,8 @@
   const tinyPhotos = [];
 
   // =====================================================
-  //   ОБЩАЯ КОЛОДА (одна для всех слоёв)
+  //   ОБЩАЯ КОЛОДА
   // =====================================================
-  // Гарантирует: пока все уникальные фото не выданы — повторов не будет.
-  // После исчерпания тасуется заново, но первый элемент новой колоды
-  // не совпадёт с последним выданным.
 
   function shuffleArray(arr) {
     const a = arr.slice();
@@ -259,17 +256,14 @@
         lastIssued = v;
         return v;
       },
-      // взять значение, которого нет в avoidSet, не нарушая «без повторов до конца колоды»
       nextAvoiding(avoidSet) {
         if (deck.length === 0) refill();
         if (deck.length === 0) return null;
-        // сначала пытаемся найти подходящее в текущей колоде, не ломая порядок
         let pickIdx = -1;
         for (let i = 0; i < deck.length; i++) {
           if (!avoidSet.has(deck[i])) { pickIdx = i; break; }
         }
         if (pickIdx === -1) {
-          // все оставшиеся в колоде — соседи. Берём первый и идём дальше.
           pickIdx = 0;
         }
         const v = deck.splice(pickIdx, 1)[0];
@@ -284,10 +278,8 @@
     };
   }
 
-  // ОДНА общая колода фото для всех слоёв
   const photoDeck = createDeck(() => realPhotos);
 
-  // Иконки/градиенты пусть остаются по слоям — они декоративные
   const iconDeckBig    = createDeck(() => icons);
   const iconDeckSmall  = createDeck(() => icons);
   const iconDeckTiny   = createDeck(() => icons);
@@ -296,18 +288,14 @@
   const gradDeckTiny   = createDeck(() => gradients);
 
   // =====================================================
-  //   ПРОСТРАНСТВЕННАЯ СЕТКА (общая для всех слоёв)
+  //   ПРОСТРАНСТВЕННАЯ СЕТКА
   // =====================================================
-  // Используем для проверки: «есть ли рядом плитка с таким же фото?»
-  // Размер ячейки = BIG_CELL — крупный шаг, чтобы соседство было «визуальным».
 
   const SPATIAL_CELL_W = BIG_CELL_W;
   const SPATIAL_CELL_H = BIG_CELL_H;
   const SPATIAL_COLS = Math.ceil(VW / SPATIAL_CELL_W) + 1;
   const SPATIAL_ROWS = Math.ceil(VH / SPATIAL_CELL_H) + 1;
 
-  // Для каждой плитки храним её центр на экране (cx, cy)
-  // и её слой/индекс. В spatialGrid[r][c] — Set элементов в этой клетке.
   const spatialGrid = [];
   for (let r = 0; r < SPATIAL_ROWS; r++) {
     spatialGrid.push([]);
@@ -329,10 +317,6 @@
     spatialGrid[r][c].add(el);
   }
 
-  // Радиус соседства зависит от слоя: для big — 1 ячейка вокруг,
-  // для small — тоже 1, для tiny — 1 (в spatial-сетке шагом BIG_CELL это уже большой радиус).
-  // Но также мы дополнительно учитываем расстояние по центрам.
-  // NEIGHBOR_DIST — в пикселях; если новое фото уже стоит у плитки ближе — отказ.
   const NEIGHBOR_DIST_PX = Math.max(BIG_CELL_W, BIG_CELL_H) * 1.6;
 
   function neighborPhotoSet(cx, cy) {
@@ -364,7 +348,6 @@
         const nr = r + dr, nc = c + dc;
         if (nr < 0 || nr >= SPATIAL_ROWS || nc < 0 || nc >= SPATIAL_COLS) continue;
         for (const other of spatialGrid[nr][nc]) {
-          // для иконок проверяем только тот же слой
           if (other._layer !== layerKey) continue;
           const ic = other.dataset.icon;
           if (!ic) continue;
@@ -380,14 +363,13 @@
   }
 
   // =====================================================
-  //   УСТАНОВКА СОДЕРЖИМОГО ПЛИТКИ
+  //   СОДЕРЖИМОЕ ПЛИТКИ
   // =====================================================
 
   function setPhotoContentSmart(el) {
     const cx = el._cx, cy = el._cy;
     if (realPhotos.length > 0) {
       const avoid = neighborPhotoSet(cx, cy);
-      // если уникальных фото мало (<= число соседей) — повторов не избежать
       const url = photoDeck.nextAvoiding(avoid);
       if (url) {
         el.style.background = `#000 url("${url}") center/cover no-repeat`;
@@ -413,8 +395,11 @@
     }
   }
 
-  // Совместимость со старым кодом
   function setPhotoContent(el) {
+    setPhotoContentSmart(el);
+  }
+
+  function refreshTile(el) {
     setPhotoContentSmart(el);
   }
 
@@ -513,7 +498,7 @@
       const h = TINY_CELL_H - 2;
       const el = createTile('tiny', cx, cy, w, h);
 
-            const angle = Math.random() * Math.PI * 2;
+      const angle = Math.random() * Math.PI * 2;
       const dist = Math.max(VW, VH) + 150;
       const fx = Math.cos(angle) * dist;
       const fy = Math.sin(angle) * dist;
@@ -532,15 +517,11 @@
   }
 
   // =====================================================
-  //   ИНИЦИАЛЬНОЕ ЗАПОЛНЕНИЕ С УЧЁТОМ СОСЕДЕЙ
+  //   ИНИЦИАЛЬНОЕ ЗАПОЛНЕНИЕ
   // =====================================================
-  // Заполняем плитки в порядке "от центра экрана наружу" — так визуально
-  // важная центральная зона получит максимально разные фото.
 
   function fillAllTilesSmart() {
     const allTiles = [...photos, ...smallPhotos, ...tinyPhotos];
-    // Сортируем: сначала большие (они «фон»), потом мелкие.
-    // Внутри каждого слоя — по расстоянию от центра.
     const cx0 = VW/2, cy0 = VH/2;
     const layerOrder = { big: 0, small: 1, tiny: 2 };
     allTiles.sort((a, b) => {
@@ -557,18 +538,8 @@
   }
 
   // =====================================================
-  //   ОБНОВЛЕНИЕ ОДНОЙ ПЛИТКИ (для ротации)
-  // =====================================================
-
-  function refreshTile(el) {
-    setPhotoContentSmart(el);
-  }
-
-  // =====================================================
   //   ПРИМЕНИТЬ НОВОЕ ФОТО НЕМЕДЛЕННО
   // =====================================================
-  // При получении нового одобренного фото — поставим его на несколько
-  // случайных плиток так, чтобы рядом не было дубликата.
 
   function applyImmediatePhoto(url) {
     if (!url) return;
@@ -604,8 +575,12 @@
   }
 
   // =====================================================
-  //   АНИМАЦИЯ ВЫЛЕТА И РОТАЦИЯ
+  //   АНИМАЦИЯ
   // =====================================================
+
+  function wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
 
   async function startAnimation() {
     const shuffled = [...photos].sort(() => Math.random() - 0.5);
@@ -694,7 +669,7 @@
   }
 
   // =====================================================
-  //   SVG: ЗАГОЛОВОК + ГОД С ПРОКРУТКОЙ ЦИФРЫ
+  //   SVG: ЗАГОЛОВОК + ГОД
   // =====================================================
 
   const svgNS = "http://www.w3.org/2000/svg";
@@ -983,10 +958,6 @@
     });
   }
 
-  function wait(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
   // =====================================================
   //   КОНФЕТТИ
   // =====================================================
@@ -1008,7 +979,7 @@
   ];
   const particles = [];
 
-    function spawnParticle(fromLeft) {
+  function spawnParticle(fromLeft) {
     const W = confettiCanvas.width;
     const H = confettiCanvas.height;
     const x = fromLeft ? -20 : W + 20;
@@ -1097,8 +1068,22 @@
   }
 
   // =====================================================
-  //   ЗАПУСК
+  //   ЗАПУСК ПО ПРОБЕЛУ
   // =====================================================
+
+  let animationStarted = false;
+
+  function startCollageShow() {
+    if (animationStarted) return;
+    animationStarted = true;
+
+    // Прячем интро-видео
+    introVideo.classList.add('hidden');
+    setTimeout(() => { introVideo.style.display = 'none'; }, 600);
+
+    // Запускаем анимацию коллажа
+    startAnimation();
+  }
 
   (async function main() {
     await loadApprovedPhotos();
@@ -1107,17 +1092,20 @@
     createSmallPhotos();
     createTinyPhotos();
 
-    // Заполняем все плитки с учётом соседей и единой колоды
+    // Заполняем все плитки с учётом соседей и единой колоды.
+    // Сами плитки пока остаются за пределами экрана (без класса .flying).
     fillAllTilesSmart();
 
-    // Прячем интро-видео
-    setTimeout(() => {
-      introVideo.classList.add('hidden');
-      setTimeout(() => { introVideo.style.display = 'none'; }, 600);
-    }, 800);
-
-    startAnimation();
+    console.log('Готово. Нажмите ПРОБЕЛ для запуска коллажа.');
   })();
+
+  // Запуск по нажатию пробела
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' || e.key === ' ') {
+      e.preventDefault();
+      startCollageShow();
+    }
+  });
 
   // =====================================================
   //   WebSocket: новые фото и wipe
@@ -1133,10 +1121,11 @@
       if (msg.type === 'approved' && msg.url) {
         if (!realPhotos.includes(msg.url)) {
           realPhotos.push(msg.url);
-          // Сбрасываем общую колоду фото, чтобы новое попало в ротацию
           photoDeck.reset();
-          // Немедленно отображаем на нескольких случайных плитках
-          applyImmediatePhoto(msg.url);
+          // Применяем немедленно только если шоу уже идёт
+          if (animationStarted) {
+            applyImmediatePhoto(msg.url);
+          }
         }
       }
       if (msg.type === 'wipe') {
@@ -1148,8 +1137,11 @@
         gradDeckBig.reset();
         gradDeckSmall.reset();
         gradDeckTiny.reset();
-        // Перерисовываем все плитки с учётом соседей
         fillAllTilesSmart();
+      }
+      // Удалённый запуск коллажа (опционально)
+      if (msg.type === 'start') {
+        startCollageShow();
       }
     });
     ws.addEventListener('close', () => setTimeout(connectWS, 1500));
