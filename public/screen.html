@@ -137,7 +137,7 @@
        disablepictureinpicture disableremoteplayback
        controlslist="nodownload noplaybackrate nofullscreen"
        x-webkit-airplay="deny">
-  <source src="video/intro1.mp4" type="video/mp4">
+  <source src="video/intro.mp4" type="video/mp4">
 </video>
 
 <div class="final-fade" id="finalFade"></div>
@@ -218,36 +218,237 @@
   const smallPhotos = [];
   const tinyPhotos = [];
 
-  function setPhotoContent(el) {
+  // =====================================================
+  //   ОБЩАЯ КОЛОДА (одна для всех слоёв)
+  // =====================================================
+  // Гарантирует: пока все уникальные фото не выданы — повторов не будет.
+  // После исчерпания тасуется заново, но первый элемент новой колоды
+  // не совпадёт с последним выданным.
+
+  function shuffleArray(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function createDeck(getSource) {
+    let deck = [];
+    let lastIssued = null;
+
+    function refill() {
+      const src = getSource();
+      if (!src || src.length === 0) {
+        deck = [];
+        return;
+      }
+      deck = shuffleArray(src);
+      if (deck.length > 1 && deck[0] === lastIssued) {
+        const swapIdx = 1 + Math.floor(Math.random() * (deck.length - 1));
+        [deck[0], deck[swapIdx]] = [deck[swapIdx], deck[0]];
+      }
+    }
+
+    return {
+      next() {
+        if (deck.length === 0) refill();
+        if (deck.length === 0) return null;
+        const v = deck.shift();
+        lastIssued = v;
+        return v;
+      },
+      // взять значение, которого нет в avoidSet, не нарушая «без повторов до конца колоды»
+      nextAvoiding(avoidSet) {
+        if (deck.length === 0) refill();
+        if (deck.length === 0) return null;
+        // сначала пытаемся найти подходящее в текущей колоде, не ломая порядок
+        let pickIdx = -1;
+        for (let i = 0; i < deck.length; i++) {
+          if (!avoidSet.has(deck[i])) { pickIdx = i; break; }
+        }
+        if (pickIdx === -1) {
+          // все оставшиеся в колоде — соседи. Берём первый и идём дальше.
+          pickIdx = 0;
+        }
+        const v = deck.splice(pickIdx, 1)[0];
+        lastIssued = v;
+        return v;
+      },
+      reset() {
+        deck = [];
+        lastIssued = null;
+      },
+      remaining() { return deck.length; }
+    };
+  }
+
+  // ОДНА общая колода фото для всех слоёв
+  const photoDeck = createDeck(() => realPhotos);
+
+  // Иконки/градиенты пусть остаются по слоям — они декоративные
+  const iconDeckBig    = createDeck(() => icons);
+  const iconDeckSmall  = createDeck(() => icons);
+  const iconDeckTiny   = createDeck(() => icons);
+  const gradDeckBig    = createDeck(() => gradients);
+  const gradDeckSmall  = createDeck(() => gradients);
+  const gradDeckTiny   = createDeck(() => gradients);
+
+  // =====================================================
+  //   ПРОСТРАНСТВЕННАЯ СЕТКА (общая для всех слоёв)
+  // =====================================================
+  // Используем для проверки: «есть ли рядом плитка с таким же фото?»
+  // Размер ячейки = BIG_CELL — крупный шаг, чтобы соседство было «визуальным».
+
+  const SPATIAL_CELL_W = BIG_CELL_W;
+  const SPATIAL_CELL_H = BIG_CELL_H;
+  const SPATIAL_COLS = Math.ceil(VW / SPATIAL_CELL_W) + 1;
+  const SPATIAL_ROWS = Math.ceil(VH / SPATIAL_CELL_H) + 1;
+
+  // Для каждой плитки храним её центр на экране (cx, cy)
+  // и её слой/индекс. В spatialGrid[r][c] — Set элементов в этой клетке.
+  const spatialGrid = [];
+  for (let r = 0; r < SPATIAL_ROWS; r++) {
+    spatialGrid.push([]);
+    for (let c = 0; c < SPATIAL_COLS; c++) {
+      spatialGrid[r].push(new Set());
+    }
+  }
+
+  function spatialCellOf(cx, cy) {
+    const c = Math.max(0, Math.min(SPATIAL_COLS - 1, Math.floor(cx / SPATIAL_CELL_W)));
+    const r = Math.max(0, Math.min(SPATIAL_ROWS - 1, Math.floor(cy / SPATIAL_CELL_H)));
+    return { r, c };
+  }
+
+  function registerInSpatial(el) {
+    const { r, c } = spatialCellOf(el._cx, el._cy);
+    el._spatialR = r;
+    el._spatialC = c;
+    spatialGrid[r][c].add(el);
+  }
+
+  // Радиус соседства зависит от слоя: для big — 1 ячейка вокруг,
+  // для small — тоже 1, для tiny — 1 (в spatial-сетке шагом BIG_CELL это уже большой радиус).
+  // Но также мы дополнительно учитываем расстояние по центрам.
+  // NEIGHBOR_DIST — в пикселях; если новое фото уже стоит у плитки ближе — отказ.
+  const NEIGHBOR_DIST_PX = Math.max(BIG_CELL_W, BIG_CELL_H) * 1.6;
+
+  function neighborPhotoSet(cx, cy) {
+    const { r, c } = spatialCellOf(cx, cy);
+    const set = new Set();
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        const nr = r + dr, nc = c + dc;
+        if (nr < 0 || nr >= SPATIAL_ROWS || nc < 0 || nc >= SPATIAL_COLS) continue;
+        for (const other of spatialGrid[nr][nc]) {
+          const url = other.dataset.photoUrl;
+          if (!url) continue;
+          const dx = other._cx - cx;
+          const dy = other._cy - cy;
+          if (dx*dx + dy*dy <= NEIGHBOR_DIST_PX * NEIGHBOR_DIST_PX) {
+            set.add(url);
+          }
+        }
+      }
+    }
+    return set;
+  }
+
+  function neighborIconSet(cx, cy, layerKey) {
+    const { r, c } = spatialCellOf(cx, cy);
+    const set = new Set();
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        const nr = r + dr, nc = c + dc;
+        if (nr < 0 || nr >= SPATIAL_ROWS || nc < 0 || nc >= SPATIAL_COLS) continue;
+        for (const other of spatialGrid[nr][nc]) {
+          // для иконок проверяем только тот же слой
+          if (other._layer !== layerKey) continue;
+          const ic = other.dataset.icon;
+          if (!ic) continue;
+          const dx = other._cx - cx;
+          const dy = other._cy - cy;
+          if (dx*dx + dy*dy <= NEIGHBOR_DIST_PX * NEIGHBOR_DIST_PX) {
+            set.add(ic);
+          }
+        }
+      }
+    }
+    return set;
+  }
+
+  // =====================================================
+  //   УСТАНОВКА СОДЕРЖИМОГО ПЛИТКИ
+  // =====================================================
+
+  function setPhotoContentSmart(el) {
+    const cx = el._cx, cy = el._cy;
     if (realPhotos.length > 0) {
-      const url = realPhotos[Math.floor(Math.random() * realPhotos.length)];
-      el.style.background = `#000 url("${url}") center/cover no-repeat`;
-      el.textContent = '';
+      const avoid = neighborPhotoSet(cx, cy);
+      // если уникальных фото мало (<= число соседей) — повторов не избежать
+      const url = photoDeck.nextAvoiding(avoid);
+      if (url) {
+        el.style.background = `#000 url("${url}") center/cover no-repeat`;
+        el.textContent = '';
+        el.dataset.photoUrl = url;
+        delete el.dataset.icon;
+      }
     } else {
-      const icon = icons[Math.floor(Math.random() * icons.length)];
-      const grad = gradients[Math.floor(Math.random() * gradients.length)];
+      const layer = el._layer;
+      let iconDeck, gradDeck;
+      if (layer === 'big')        { iconDeck = iconDeckBig;   gradDeck = gradDeckBig;   }
+      else if (layer === 'small') { iconDeck = iconDeckSmall; gradDeck = gradDeckSmall; }
+      else                        { iconDeck = iconDeckTiny;  gradDeck = gradDeckTiny;  }
+
+      const avoidIcons = neighborIconSet(cx, cy, layer);
+      const icon = iconDeck.nextAvoiding(avoidIcons) || icons[0];
+      const grad = gradDeck.next() || gradients[0];
+
       el.style.background = grad;
       el.textContent = icon;
+      el.dataset.icon = icon;
+      delete el.dataset.photoUrl;
     }
+  }
+
+  // Совместимость со старым кодом
+  function setPhotoContent(el) {
+    setPhotoContentSmart(el);
+  }
+
+  // =====================================================
+  //   СОЗДАНИЕ ПЛИТОК
+  // =====================================================
+
+  function createTile(layerKey, cx, cy, w, h) {
+    const el = document.createElement('div');
+    el.className = 'photo' + (layerKey === 'small' ? ' small' : layerKey === 'tiny' ? ' tiny' : '');
+    el.style.width = w + 'px';
+    el.style.height = h + 'px';
+    el.style.marginLeft = (-w/2) + 'px';
+    el.style.marginTop = (-h/2) + 'px';
+    el.style.left = '50%';
+    el.style.top = '50%';
+    el._cx = cx;
+    el._cy = cy;
+    el._layer = layerKey;
+    return el;
   }
 
   function createBigPhotos() {
     for (let i = 0; i < BIG_TOTAL; i++) {
       const row = Math.floor(i / BIG_COLS);
       const col = i % BIG_COLS;
-      const tx = col * BIG_CELL_W - VW/2 + BIG_CELL_W/2;
-      const ty = row * BIG_CELL_H - VH/2 + BIG_CELL_H/2;
+      const cx = col * BIG_CELL_W + BIG_CELL_W/2;
+      const cy = row * BIG_CELL_H + BIG_CELL_H/2;
+      const tx = cx - VW/2;
+      const ty = cy - VH/2;
 
-      const el = document.createElement('div');
-      el.className = 'photo';
       const w = BIG_CELL_W - 6;
       const h = BIG_CELL_H - 6;
-      el.style.width = w + 'px';
-      el.style.height = h + 'px';
-      el.style.marginLeft = (-w/2) + 'px';
-      el.style.marginTop = (-h/2) + 'px';
-      el.style.left = '50%';
-      el.style.top = '50%';
+      const el = createTile('big', cx, cy, w, h);
 
       const angle = Math.random() * Math.PI * 2;
       const dist = Math.max(VW, VH) + 400 + Math.random() * 500;
@@ -262,9 +463,9 @@
       el.style.setProperty('--ty', ty + 'px');
       el.style.setProperty('--rot', (Math.random() * 8 - 4) + 'deg');
 
-      setPhotoContent(el);
       collage.appendChild(el);
       photos.push(el);
+      registerInSpatial(el);
     }
   }
 
@@ -272,19 +473,14 @@
     for (let i = 0; i < SMALL_TOTAL; i++) {
       const row = Math.floor(i / SMALL_COLS);
       const col = i % SMALL_COLS;
-      const tx = col * SMALL_CELL_W - VW/2 + SMALL_CELL_W/2;
-      const ty = row * SMALL_CELL_H - VH/2 + SMALL_CELL_H/2;
+      const cx = col * SMALL_CELL_W + SMALL_CELL_W/2;
+      const cy = row * SMALL_CELL_H + SMALL_CELL_H/2;
+      const tx = cx - VW/2;
+      const ty = cy - VH/2;
 
-      const el = document.createElement('div');
-      el.className = 'photo small';
       const w = SMALL_CELL_W - 3;
       const h = SMALL_CELL_H - 3;
-      el.style.width = w + 'px';
-      el.style.height = h + 'px';
-      el.style.marginLeft = (-w/2) + 'px';
-      el.style.marginTop = (-h/2) + 'px';
-      el.style.left = '50%';
-      el.style.top = '50%';
+      const el = createTile('small', cx, cy, w, h);
 
       const angle = Math.random() * Math.PI * 2;
       const dist = Math.max(VW, VH) + 200;
@@ -298,9 +494,9 @@
       el.style.setProperty('--ty', ty + 'px');
       el.style.setProperty('--rot', (Math.random()*6-3) + 'deg');
 
-      setPhotoContent(el);
       collage.appendChild(el);
       smallPhotos.push(el);
+      registerInSpatial(el);
     }
   }
 
@@ -308,21 +504,16 @@
     for (let i = 0; i < TINY_TOTAL; i++) {
       const row = Math.floor(i / TINY_COLS);
       const col = i % TINY_COLS;
-      const tx = col * TINY_CELL_W - VW/2 + TINY_CELL_W/2;
-      const ty = row * TINY_CELL_H - VH/2 + TINY_CELL_H/2;
+      const cx = col * TINY_CELL_W + TINY_CELL_W/2;
+      const cy = row * TINY_CELL_H + TINY_CELL_H/2;
+      const tx = cx - VW/2;
+      const ty = cy - VH/2;
 
-      const el = document.createElement('div');
-      el.className = 'photo tiny';
       const w = TINY_CELL_W - 2;
       const h = TINY_CELL_H - 2;
-      el.style.width = w + 'px';
-      el.style.height = h + 'px';
-      el.style.marginLeft = (-w/2) + 'px';
-      el.style.marginTop = (-h/2) + 'px';
-      el.style.left = '50%';
-      el.style.top = '50%';
+      const el = createTile('tiny', cx, cy, w, h);
 
-      const angle = Math.random() * Math.PI * 2;
+            const angle = Math.random() * Math.PI * 2;
       const dist = Math.max(VW, VH) + 150;
       const fx = Math.cos(angle) * dist;
       const fy = Math.sin(angle) * dist;
@@ -332,84 +523,89 @@
       el.style.setProperty('--fr', (Math.random()*360) + 'deg');
       el.style.setProperty('--tx', tx + 'px');
       el.style.setProperty('--ty', ty + 'px');
-      el.style.setProperty('--rot', (Math.random()*6-3) + 'deg');
+      el.style.setProperty('--rot', (Math.random()*4-2) + 'deg');
 
-      setPhotoContent(el);
       collage.appendChild(el);
       tinyPhotos.push(el);
+      registerInSpatial(el);
     }
   }
 
-  (async () => {
-    await loadApprovedPhotos();
-    createBigPhotos();
-    createSmallPhotos();
-    createTinyPhotos();
-    try {
-      const p = introVideo.play();
-      if (p && typeof p.catch === 'function') p.catch(() => {});
-    } catch(_) {}
-  })();
+  // =====================================================
+  //   ИНИЦИАЛЬНОЕ ЗАПОЛНЕНИЕ С УЧЁТОМ СОСЕДЕЙ
+  // =====================================================
+  // Заполняем плитки в порядке "от центра экрана наружу" — так визуально
+  // важная центральная зона получит максимально разные фото.
 
-  let phase = 'intro';
-  let confettiFinished = false;
-
-  document.addEventListener('keydown', (e) => {
-    if (e.code !== 'Space') return;
-    e.preventDefault();
-
-    if (phase === 'intro') {
-      phase = 'collage';
-      transitionFromIntroToCollage();
-    } else if (phase === 'done' && confettiFinished) {
-      phase = 'faded';
-      fadeToBlack();
+  function fillAllTilesSmart() {
+    const allTiles = [...photos, ...smallPhotos, ...tinyPhotos];
+    // Сортируем: сначала большие (они «фон»), потом мелкие.
+    // Внутри каждого слоя — по расстоянию от центра.
+    const cx0 = VW/2, cy0 = VH/2;
+    const layerOrder = { big: 0, small: 1, tiny: 2 };
+    allTiles.sort((a, b) => {
+      if (layerOrder[a._layer] !== layerOrder[b._layer]) {
+        return layerOrder[a._layer] - layerOrder[b._layer];
+      }
+      const da = (a._cx-cx0)*(a._cx-cx0) + (a._cy-cy0)*(a._cy-cy0);
+      const db = (b._cx-cx0)*(b._cx-cx0) + (b._cy-cy0)*(b._cy-cy0);
+      return da - db;
+    });
+    for (const el of allTiles) {
+      setPhotoContentSmart(el);
     }
-  });
-
-  function transitionFromIntroToCollage() {
-    introVideo.classList.add('hidden');
-    setTimeout(() => {
-      try { introVideo.pause(); } catch(_) {}
-      introVideo.style.display = 'none';
-      startAnimation();
-    }, 500);
   }
 
-  function fadeToBlack() {
-    finalFade.classList.add('visible');
-    setTimeout(() => {
-      try {
-        document.getElementById('collageWrap').style.display = 'none';
-        const pl = document.getElementById('purpleLayer');
-        if (pl) pl.style.display = 'none';
-        const cc = document.getElementById('confetti');
-        if (cc) cc.style.display = 'none';
-      } catch(_) {}
-    }, 1300);
+  // =====================================================
+  //   ОБНОВЛЕНИЕ ОДНОЙ ПЛИТКИ (для ротации)
+  // =====================================================
+
+  function refreshTile(el) {
+    setPhotoContentSmart(el);
   }
+
+  // =====================================================
+  //   ПРИМЕНИТЬ НОВОЕ ФОТО НЕМЕДЛЕННО
+  // =====================================================
+  // При получении нового одобренного фото — поставим его на несколько
+  // случайных плиток так, чтобы рядом не было дубликата.
 
   function applyImmediatePhoto(url) {
     if (!url) return;
-    const all = [...photos, ...smallPhotos, ...tinyPhotos];
-    if (all.length === 0) return;
-    // Меняем несколько случайных ячеек для заметности
-    const count = Math.min(2 + Math.floor(Math.random() * 4), all.length);
+    const allTiles = [...photos, ...smallPhotos, ...tinyPhotos];
+    if (allTiles.length === 0) return;
+
+    const count = 2 + Math.floor(Math.random() * 4);
     const used = new Set();
-    for (let i = 0; i < count; i++) {
-      const idx = Math.floor(Math.random() * all.length);
+    let placed = 0;
+    let attempts = 0;
+
+    while (placed < count && attempts < count * 30) {
+      attempts++;
+      const idx = Math.floor(Math.random() * allTiles.length);
       if (used.has(idx)) continue;
+      const el = allTiles[idx];
+      const avoid = neighborPhotoSet(el._cx, el._cy);
+      if (avoid.has(url)) continue;
+
       used.add(idx);
-      const el = all[idx];
+      placed++;
+
       el.style.transition = 'opacity 0.5s ease';
       el.style.opacity = '0.4';
       setTimeout(() => {
         el.style.background = `#000 url("${url}") center/cover no-repeat`;
         el.textContent = '';
+        el.dataset.photoUrl = url;
+        delete el.dataset.icon;
         el.style.opacity = '1';
       }, 300);
     }
   }
+
+  // =====================================================
+  //   АНИМАЦИЯ ВЫЛЕТА И РОТАЦИЯ
+  // =====================================================
 
   async function startAnimation() {
     const shuffled = [...photos].sort(() => Math.random() - 0.5);
@@ -421,11 +617,12 @@
 
     setTimeout(() => {
       setInterval(() => {
-        const rnd = photos[Math.floor(Math.random() * photos.length)];
+        const idx = Math.floor(Math.random() * photos.length);
+        const rnd = photos[idx];
         rnd.style.transition = 'opacity 0.7s ease, transform 0.7s ease';
         rnd.style.opacity = '0.3';
         setTimeout(() => {
-          setPhotoContent(rnd);
+          refreshTile(rnd);
           rnd.style.opacity = '1';
         }, 700);
       }, 900);
@@ -442,11 +639,12 @@
     setTimeout(() => {
       setInterval(() => {
         for (let k = 0; k < 2; k++) {
-          const rnd = smallPhotos[Math.floor(Math.random() * smallPhotos.length)];
+          const idx = Math.floor(Math.random() * smallPhotos.length);
+          const rnd = smallPhotos[idx];
           rnd.style.transition = 'opacity 0.55s ease';
           rnd.style.opacity = '0.3';
           setTimeout(() => {
-            setPhotoContent(rnd);
+            refreshTile(rnd);
             rnd.style.opacity = '1';
           }, 550);
         }
@@ -464,11 +662,12 @@
     setTimeout(() => {
       setInterval(() => {
         for (let k = 0; k < 2; k++) {
-          const rnd = tinyPhotos[Math.floor(Math.random() * tinyPhotos.length)];
+          const idx = Math.floor(Math.random() * tinyPhotos.length);
+          const rnd = tinyPhotos[idx];
           rnd.style.transition = 'opacity 0.5s ease';
           rnd.style.opacity = '0.35';
           setTimeout(() => {
-            setPhotoContent(rnd);
+            refreshTile(rnd);
             rnd.style.opacity = '1';
           }, 500);
         }
@@ -493,6 +692,10 @@
     await wait(400);
     launchConfetti();
   }
+
+  // =====================================================
+  //   SVG: ЗАГОЛОВОК + ГОД С ПРОКРУТКОЙ ЦИФРЫ
+  // =====================================================
 
   const svgNS = "http://www.w3.org/2000/svg";
   const YEAR_Y_PERCENT = 80;
@@ -784,6 +987,10 @@
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  // =====================================================
+  //   КОНФЕТТИ
+  // =====================================================
+
   const confettiCanvas = document.getElementById('confetti');
   const cctx = confettiCanvas.getContext('2d');
 
@@ -801,7 +1008,7 @@
   ];
   const particles = [];
 
-  function spawnParticle(fromLeft) {
+    function spawnParticle(fromLeft) {
     const W = confettiCanvas.width;
     const H = confettiCanvas.height;
     const x = fromLeft ? -20 : W + 20;
@@ -823,6 +1030,7 @@
   }
 
   let confettiRunning = false;
+  let confettiFinished = false;
 
   function launchConfetti() {
     confettiRunning = true;
@@ -885,11 +1093,36 @@
     } else {
       cctx.clearRect(0, 0, W, H);
       confettiFinished = true;
-      phase = 'done';
     }
   }
 
-  // WebSocket: подключаемся и слушаем новые фото
+  // =====================================================
+  //   ЗАПУСК
+  // =====================================================
+
+  (async function main() {
+    await loadApprovedPhotos();
+
+    createBigPhotos();
+    createSmallPhotos();
+    createTinyPhotos();
+
+    // Заполняем все плитки с учётом соседей и единой колоды
+    fillAllTilesSmart();
+
+    // Прячем интро-видео
+    setTimeout(() => {
+      introVideo.classList.add('hidden');
+      setTimeout(() => { introVideo.style.display = 'none'; }, 600);
+    }, 800);
+
+    startAnimation();
+  })();
+
+  // =====================================================
+  //   WebSocket: новые фото и wipe
+  // =====================================================
+
   (function connectWS() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const url = `${proto}//${location.host}/?role=screen`;
@@ -900,15 +1133,23 @@
       if (msg.type === 'approved' && msg.url) {
         if (!realPhotos.includes(msg.url)) {
           realPhotos.push(msg.url);
+          // Сбрасываем общую колоду фото, чтобы новое попало в ротацию
+          photoDeck.reset();
           // Немедленно отображаем на нескольких случайных плитках
           applyImmediatePhoto(msg.url);
         }
       }
       if (msg.type === 'wipe') {
         realPhotos.length = 0;
-        // Вернуть все плитки в исходное состояние
-        const all = [...photos, ...smallPhotos, ...tinyPhotos];
-        all.forEach(el => setPhotoContent(el));
+        photoDeck.reset();
+        iconDeckBig.reset();
+        iconDeckSmall.reset();
+        iconDeckTiny.reset();
+        gradDeckBig.reset();
+        gradDeckSmall.reset();
+        gradDeckTiny.reset();
+        // Перерисовываем все плитки с учётом соседей
+        fillAllTilesSmart();
       }
     });
     ws.addEventListener('close', () => setTimeout(connectWS, 1500));
