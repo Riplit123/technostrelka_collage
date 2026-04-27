@@ -21,7 +21,7 @@ const SUPERADMIN_SECRET = process.env.SUPERADMIN_SECRET || 'root-9xQ2k';
 const MAX_UPLOAD_MB = 8;
 const PHOTO_MAX_WIDTH = 1200;
 const PHOTO_QUALITY = 82;
-const MAX_APPROVED_PHOTOS = 200; // лимит фото в коллаже (скрытый)
+const MAX_APPROVED_PHOTOS = 500; // лимит фото в коллаже (скрытый)
 
 const START_TIME = Date.now();
 
